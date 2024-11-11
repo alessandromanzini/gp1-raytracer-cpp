@@ -20,3 +20,6 @@ bld/
 
 # Do not ignore libs
 !project/libs/**
+/project/src/.DS_Store
+/.DS_Store
+/project/.DS_Store
