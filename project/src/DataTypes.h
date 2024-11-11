@@ -4,7 +4,6 @@
 
 #include "Maths.h"
 
-
 namespace dae
 {
 #pragma region GEOMETRY
@@ -209,6 +208,22 @@ namespace dae
 
 		bool didHit{ false };
 		unsigned char materialIndex{ 0 };
+	};
+
+	class Material;
+	struct LightingInfo
+	{
+		Vector3 rayDirection;
+		Ray hitRay;
+
+		HitRecord closestHit;
+
+		const Light* pLight;
+		Vector3 hitToLight;
+
+		Material* pMaterial;
+
+		float observedAreaMeasure;
 	};
 #pragma endregion
 }
