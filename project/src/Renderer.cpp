@@ -23,7 +23,18 @@ Renderer::Renderer( SDL_Window* pWindow ) :
 	m_AspectRatio = float( m_Width ) / float( m_Height );
 	m_pBufferPixels = static_cast<uint32_t*>( m_pBuffer->pixels );
 
+	// Create a dynamic array with the amount of pixels
+	uint32_t amountOfPixels{ uint32_t( m_Width * m_Height ) };
+	m_pPixelIndices = new uint32_t[amountOfPixels];
+	// Fill with sequential values starting at 0
+	std::iota( m_pPixelIndices, m_pPixelIndices + amountOfPixels, 0 );
+
 	SetLightingMode( LightingMode::Combined );
+}
+
+dae::Renderer::~Renderer( )
+{
+	delete[] m_pPixelIndices;
 }
 
 void Renderer::Render( Scene* pScene ) const
@@ -34,15 +45,8 @@ void Renderer::Render( Scene* pScene ) const
 #ifdef PARALLEL_EXECUTION
 	// Parallel logic
 	uint32_t amountOfPixels{ uint32_t( m_Width * m_Height ) };
-	std::vector<uint32_t> pixelIndices;
 
-	pixelIndices.reserve( amountOfPixels );
-	for ( uint32_t pixelIdx{}; pixelIdx < amountOfPixels; ++pixelIdx )
-	{
-		pixelIndices.emplace_back( pixelIdx );
-	}
-
-	std::for_each( std::execution::par, pixelIndices.begin( ), pixelIndices.end( ), 
+	std::for_each( std::execution::par, m_pPixelIndices, m_pPixelIndices + amountOfPixels,
 	[this, pScene, &camera]( uint32_t pixelIdx )
 		{
 			RenderPixel( pScene, pixelIdx, camera );
@@ -65,6 +69,7 @@ void dae::Renderer::RenderPixel( Scene* pScene, uint32_t pixelIdx, const Camera&
 {
 	const uint32_t px{ pixelIdx % m_Width };
 	const uint32_t py{ pixelIdx / m_Width };
+
 	float x, y;
 	ScreenToNDC( x, y, px, py, camera.fovCoefficient );
 

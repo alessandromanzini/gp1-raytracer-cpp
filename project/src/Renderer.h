@@ -16,7 +16,7 @@ namespace dae
 	{
 	public:
 		Renderer( SDL_Window* pWindow );
-		~Renderer( ) = default;
+		~Renderer( );
 
 		Renderer( const Renderer& ) = delete;
 		Renderer( Renderer&& ) noexcept = delete;
@@ -47,6 +47,8 @@ namespace dae
 
 		SDL_Surface* m_pBuffer{};
 		uint32_t* m_pBufferPixels{};
+
+		uint32_t* m_pPixelIndices{};
 
 		int m_Width{};
 		int m_Height{};
