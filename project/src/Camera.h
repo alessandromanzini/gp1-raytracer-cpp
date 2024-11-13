@@ -20,11 +20,11 @@ namespace dae
 
 		const float MOVEMENT_SPEED{ 3.f };
 		const float CAMERA_ROTATION_SPEED{ 0.01f };
-		const int8_t INVERT_CAMERA_AXIS{ -1 };
+		const int8_t INVERT_CAMERA_AXIS{ 1 };
 
 		Vector3 origin{};
 		float fovAngle{ 90.f };
-		float fovCoefficient{};
+		float fovCoefficient{ 1.f };
 
 		Vector3 forward{ Vector3::UnitZ };
 		Vector3 up{ Vector3::UnitY };
@@ -78,7 +78,6 @@ namespace dae
 			right = Vector3::Cross( Vector3::UnitY, forward );
 			right.Normalize( );
 			up = Vector3::Cross( forward, right );
-			up.Normalized( );
 		}
 
 		inline void FovChanged( )
@@ -109,11 +108,11 @@ namespace dae
 			}
 			if ( pKeyboardState[SDL_SCANCODE_E] )
 			{
-				origin += -up * speed;
+				origin += up * speed;
 			}
 			if ( pKeyboardState[SDL_SCANCODE_Q] )
 			{
-				origin += up * speed;
+				origin += -up * speed;
 			}
 		}
 

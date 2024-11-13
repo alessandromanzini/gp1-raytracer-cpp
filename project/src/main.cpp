@@ -14,6 +14,8 @@
 #include "Renderer.h"
 #include "Scene.h"
 
+#define SCENE_SWITCH true;
+
 using namespace dae;
 
 void ShutDown( SDL_Window* pWindow )
@@ -47,7 +49,11 @@ int main( int argc, char* args[] )
 	const auto pTimer = new Timer( );
 	const auto pRenderer = new Renderer( pWindow );
 
+#if SCENE_SWITCH
 	const auto pScene = new Scene_W4_BunnyScene( );
+#else
+	const auto pScene = new Scene_W4_ReferenceScene( );
+#endif
 	pScene->Initialize( );
 
 	//Start loop

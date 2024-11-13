@@ -167,8 +167,9 @@ namespace dae
 			const float tz1{ ( mesh.transformedMinAABB.z - ray.origin.z ) / ray.direction.z };
 			const float tz2{ ( mesh.transformedMaxAABB.z - ray.origin.z ) / ray.direction.z };
 
-			float tmin{ std::min( { tx1, tx2, ty1, ty2, tz1, tz2 } ) };
-			float tmax{ std::max( { tx1, tx2, ty1, ty2, tz1, tz2 } ) };
+			// Get the maximum between the minimums and the minimum between the maximums
+			float tmin = std::max( { std::min( tx1,tx2 ), std::min( ty1,ty2 ), std::min( tz1, tz2 ) } );
+			float tmax = std::min( { std::max( tx1,tx2 ), std::max( ty1, ty2 ), std::max( tz1, tz2 ) } );
 
 			return tmax > 0 && tmax >= tmin;
 		}
@@ -233,14 +234,14 @@ namespace dae
 			}
 		}
 
-		inline ColorRGB GetRadiance(const Light& light, const Vector3& target)
+		inline ColorRGB GetRadiance(const Light& light, float sqrDistanceToLight)
 		{
 			switch ( light.type )
 			{
 			case LightType::Directional:
 				return light.color * light.intensity;
 			case LightType::Point:
-				return light.color * light.intensity / target.SqrMagnitude( );
+				return light.color * light.intensity / sqrDistanceToLight;
 			default:
 				throw std::runtime_error( "LightType not implemented yet." );
 			}

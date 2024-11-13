@@ -92,14 +92,16 @@ void dae::Renderer::RenderPixel( Scene* pScene, uint32_t pixelIdx, const Camera&
 		for ( const dae::Light& light : pScene->GetLights( ) )
 		{
 			info.hitToLight = LightUtils::GetDirectionToLight( light, info.closestHit.origin );
+			info.hitToLightDistance = info.hitToLight.Normalize( );
 			info.pLight = &light;
-			Ray shadowRay{ info.closestHit.origin, info.hitToLight.Normalized( ), .0001f, info.hitToLight.Magnitude( ) };
+
+			Ray shadowRay{ info.closestHit.origin, info.hitToLight, .0001f, info.hitToLightDistance };
 
 			// if shadow ray doesn't hit anything, we have a clear view of the light
 			// if shadows are not enabled, continue
 			if ( !m_ShadowsEnabled || !pScene->DoesHit( std::move( shadowRay ) ) )
 			{
-				info.observedAreaMeasure = Vector3::Dot( info.closestHit.normal, info.hitToLight.Normalized( ) );
+				info.observedAreaMeasure = Vector3::Dot( info.closestHit.normal, info.hitToLight );
 				if ( info.observedAreaMeasure >= 0.f )
 				{
 					// Set material and call the lighting function to obtain pixel color
@@ -147,23 +149,23 @@ inline void dae::Renderer::ScreenToNDC( float& x, float& y, int px, int py, floa
 
 void dae::Renderer::ObservedAreaLightingFn( const LightingInfo& info, ColorRGB& finalColor ) const
 {
-	finalColor += ColorRGB{ 1.f, 1.f, 1.f } *info.observedAreaMeasure;
+	finalColor += ColorRGB{ 1.f, 1.f, 1.f } * info.observedAreaMeasure;
 }
 
 void dae::Renderer::RadianceLightingFn( const LightingInfo& info, ColorRGB& finalColor ) const
 {
-	finalColor += LightUtils::GetRadiance( *info.pLight, info.hitToLight );
+	finalColor += LightUtils::GetRadiance( *info.pLight, powf( info.hitToLightDistance, 2 ) );
 }
 
 void dae::Renderer::BRDFLightingFn( const LightingInfo& info, ColorRGB& finalColor ) const
 {
-	finalColor += info.pMaterial->Shade( info.closestHit, info.hitToLight.Normalized( ), -info.hitRay.direction );
+	finalColor += info.pMaterial->Shade( info.closestHit, info.hitToLight, -info.hitRay.direction );
 }
 
 void dae::Renderer::CombinedLightingFn( const LightingInfo& info, ColorRGB& finalColor ) const
 {
-	const ColorRGB Ergb{ LightUtils::GetRadiance( *info.pLight, info.hitToLight ) };
-	const ColorRGB BRDFrgb{ info.pMaterial->Shade( info.closestHit, info.hitToLight.Normalized( ), -info.hitRay.direction ) };
+	const ColorRGB Ergb{ LightUtils::GetRadiance( *info.pLight, powf( info.hitToLightDistance, 2 ) ) };
+	const ColorRGB BRDFrgb{ info.pMaterial->Shade( info.closestHit, info.hitToLight, -info.hitRay.direction ) };
 
 	finalColor += Ergb * BRDFrgb * info.observedAreaMeasure;
 }

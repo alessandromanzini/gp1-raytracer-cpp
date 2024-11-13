@@ -123,8 +123,10 @@ namespace dae
 			normals.push_back(triangle.normal);
 
 			//Not ideal, but making sure all vertices are updated
-			if (!ignoreTransformUpdate)
+			if ( !ignoreTransformUpdate )
+			{
 				UpdateTransforms();
+			}
 		}
 
 		void CalculateNormals()
@@ -281,6 +283,7 @@ namespace dae
 
 		const Light* pLight;
 		Vector3 hitToLight;
+		float hitToLightDistance;
 
 		Material* pMaterial;
 
