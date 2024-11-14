@@ -28,11 +28,15 @@ static void LogSceneInfo( const Scene* pScene, const std::string& status, float 
 #else
 	system( "cls" );
 	std::cout << std::left;
-	std::cout << "+-------------------------------------------------+" << std::endl;
-	std::cout << "| Scene:  " << std::setw( 40 ) << pScene->GetSceneName() << "|" << std::endl;
-	std::cout << "| Mode:   " << std::setw( 40 ) << status << "|" << std::endl;
-	std::cout << "| FPS:    " << std::setw( 40 ) << dFPS << "|" << std::endl;
-	std::cout << "+-------------------------------------------------+" << std::endl;
+	std::cout << "+----------------------------------------------------+" << std::endl;
+	std::cout << "| Scene:     " << std::setw( 40 ) << pScene->GetSceneName() << "|" << std::endl;
+	std::cout << "| Mode:      " << std::setw( 40 ) << status << "|" << std::endl;
+	std::cout << "| FPS:       " << std::setw( 40 ) << dFPS << "|" << std::endl;
+	std::cout << "+----------------------------------------------------+" << std::endl;
+	/*std::cout << "| Planes:    " << std::setw() << "|" << std::endl;
+	std::cout << "| Spheres:   " << "|" << std::endl;
+	std::cout << "| Triangles: " << "|" << std::endl;
+	std::cout << "+----------------------------------------------------+" << std::endl;*/
 #endif
 }
 
@@ -49,9 +53,6 @@ static void LogSceneInfo( const Scene* pScene, LightingMode lightingMode, float 
 		break;
 	case dae::LightingMode::BRDF:
 		status = "BRDF";
-		break;
-	case dae::LightingMode::BVH:
-		status = "BVH";
 		break;
 	case dae::LightingMode::Combined:
 		status = "Combined";

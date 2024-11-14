@@ -75,7 +75,8 @@ namespace dae
 	struct BVHNode
 	{
 		dae::Vector3 aabbMin, aabbMax;
-		uint32_t leftNode, firstTriIdx, triCount; // todo leftFirst optimization
+		//uint32_t leftNode, firstTriIdx, triCount;
+		uint32_t leftFirst, triCount;
 
 		bool isLeaf( ) const
 		{
@@ -83,10 +84,10 @@ namespace dae
 		}
 	};
 
-	class BVHNodeBuilder
+	class MeshBVHNodeBuilder
 	{
 	public:
-		BVHNodeBuilder( const std::vector<Vector3>& positions, const std::vector<uint32_t>& indices );
+		MeshBVHNodeBuilder( const std::vector<Vector3>& positions, const std::vector<uint32_t>& indices );
 
 		void BuildBVH( BVHNode bvhNode[] );
 
@@ -212,7 +213,7 @@ namespace dae
 		void UpdateBVH( )
 		{
 			pBVHRoot = new BVHNode[ ( indices.size( ) / 3 ) * 2 - 1 ];
-			BVHNodeBuilder builder{ transformedPositions, indices };
+			MeshBVHNodeBuilder builder{ transformedPositions, indices };
 			builder.BuildBVH( pBVHRoot );
 		}
 
@@ -286,7 +287,6 @@ namespace dae
 	class Material;
 	struct LightingInfo
 	{
-		Vector3 rayDirection;
 		Ray hitRay;
 
 		HitRecord closestHit;
@@ -298,6 +298,14 @@ namespace dae
 		Material* pMaterial;
 
 		float observedAreaMeasure;
+	};
+
+	struct ShadeInfo
+	{
+		bool needsBounce{ false };
+
+		Ray reflectionRay;
+		float reflectance{ 0.f };
 	};
 #pragma endregion
 }

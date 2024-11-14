@@ -17,7 +17,6 @@ namespace dae
 		ObservedArea, // Lambert Cosine Law
 		Radiance,	  // Incident Radiance
 		BRDF,		  // Scattering of the light
-		BVH,		  // Bounding Volume Hierarchy
 		Combined	  // Combination of all
 	};
 
@@ -34,6 +33,7 @@ namespace dae
 
 		void Render( Scene* pScene ) const;
 		void RenderPixel( Scene* pScene, uint32_t pixelIdx, const Camera& camera ) const;
+		void ProcessRay( Scene* pScene, Ray ray, ColorRGB& finalColor, int bounce = 0 ) const;
 		bool SaveBufferToImage( ) const;
 
 		void ToggleShadows( );
@@ -43,7 +43,7 @@ namespace dae
 		
 	private:
 		LightingMode m_LightingMode{ LightingMode::Combined };
-		std::function<void( const LightingInfo&, ColorRGB& )> m_LightingFn{};
+		std::function<void( ShadeInfo& shadeInfo, const LightingInfo&, ColorRGB& )> m_LightingFn{};
 		bool m_ShadowsEnabled{ true };
 
 		SDL_Window* m_pWindow{};
@@ -60,11 +60,10 @@ namespace dae
 		//void ExecuteRenderCycle( dae::Scene* pScene ) const;
 		inline void ScreenToNDC( float& x, float& y, int px, int py, float fov ) const;
 
-		void ObservedAreaLightingFn( const LightingInfo& info, ColorRGB& finalColor ) const;
-		void RadianceLightingFn( const LightingInfo& info, ColorRGB& finalColor ) const;
-		void BRDFLightingFn( const LightingInfo& info, ColorRGB& finalColor ) const;
-		void BVHLightingFn( const LightingInfo& info, ColorRGB& finalColor ) const;
-		void CombinedLightingFn( const LightingInfo& info, ColorRGB& finalColor ) const;
+		void ObservedAreaLightingFn( ShadeInfo& shadeInfo, const LightingInfo& info, ColorRGB& finalColor ) const;
+		void RadianceLightingFn( ShadeInfo& shadeInfo, const LightingInfo& info, ColorRGB& finalColor ) const;
+		void BRDFLightingFn( ShadeInfo& shadeInfo, const LightingInfo& info, ColorRGB& finalColor ) const;
+		void CombinedLightingFn( ShadeInfo& shadeInfo, const LightingInfo& info, ColorRGB& finalColor ) const;
 
 		void UpdateBuffer( dae::ColorRGB& finalColor, uint32_t* const pBufferHead ) const;
 

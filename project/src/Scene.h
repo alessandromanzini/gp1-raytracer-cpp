@@ -5,6 +5,7 @@
 #include "Maths.h"
 #include "DataTypes.h"
 #include "Camera.h"
+#include <SDL.h>
 
 namespace dae
 {

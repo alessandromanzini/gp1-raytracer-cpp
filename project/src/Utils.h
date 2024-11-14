@@ -194,8 +194,8 @@ namespace dae
 			else
 			{
 				// else dig deeper. quicksort type of algorithm
-				bool confirm = BHV_TriangleMesh( bvhNode, ray, node.leftNode ) ||
-					BHV_TriangleMesh( bvhNode, ray, node.leftNode + 1 );
+				bool confirm = BHV_TriangleMesh( bvhNode, ray, node.leftFirst ) ||
+					BHV_TriangleMesh( bvhNode, ray, node.leftFirst + 1 );
 				return confirm;
 			}
 		}

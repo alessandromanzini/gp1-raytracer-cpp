@@ -3,19 +3,22 @@
 #include "DataTypes.h"
 #include "BRDFs.h"
 
+#define USE_REFLECTIONS
+#define MAX_REFLECTION_BOUNCES 4
+
 namespace dae
 {
 #pragma region Material BASE
 	class Material
 	{
 	public:
-		Material() = default;
-		virtual ~Material() = default;
+		Material( ) = default;
+		virtual ~Material( ) = default;
 
-		Material(const Material&) = delete;
-		Material(Material&&) noexcept = delete;
-		Material& operator=(const Material&) = delete;
-		Material& operator=(Material&&) noexcept = delete;
+		Material( const Material& ) = delete;
+		Material( Material&& ) noexcept = delete;
+		Material& operator=( const Material& ) = delete;
+		Material& operator=( Material&& ) noexcept = delete;
 
 		/**
 		 * \brief Function used to calculate the correct color for the specific material and its parameters
@@ -24,7 +27,7 @@ namespace dae
 		 * \param v view direction
 		 * \return color
 		 */
-		virtual ColorRGB Shade(const HitRecord& hitRecord = {}, const Vector3& l = {}, const Vector3& v = {}) = 0;
+		virtual ColorRGB Shade( ShadeInfo& shadeInfo, const HitRecord& hitRecord = {}, const Vector3& l = {}, const Vector3& v = {} ) = 0;
 	};
 #pragma endregion
 
@@ -34,11 +37,11 @@ namespace dae
 	class Material_SolidColor final : public Material
 	{
 	public:
-		Material_SolidColor(const ColorRGB& color) : m_Color(color)
+		Material_SolidColor( const ColorRGB& color ) : m_Color( color )
 		{
 		}
 
-		ColorRGB Shade(const HitRecord& hitRecord, const Vector3& l, const Vector3& v) override
+		ColorRGB Shade( ShadeInfo& shadeInfo, const HitRecord& hitRecord, const Vector3& l, const Vector3& v ) override
 		{
 			return m_Color;
 		}
@@ -54,12 +57,14 @@ namespace dae
 	class Material_Lambert final : public Material
 	{
 	public:
-		Material_Lambert(const ColorRGB& diffuseColor, float diffuseReflectance) :
-			m_DiffuseColor(diffuseColor), m_DiffuseReflectance(diffuseReflectance) {}
-
-		ColorRGB Shade(const HitRecord& hitRecord = {}, const Vector3& l = {}, const Vector3& v = {}) override
+		Material_Lambert( const ColorRGB& diffuseColor, float diffuseReflectance ) :
+			m_DiffuseColor( diffuseColor ), m_DiffuseReflectance( diffuseReflectance )
 		{
-			return BRDF::Lambert(m_DiffuseReflectance, m_DiffuseColor);
+		}
+
+		ColorRGB Shade( ShadeInfo& shadeInfo, const HitRecord& hitRecord = {}, const Vector3& l = {}, const Vector3& v = {} ) override
+		{
+			return BRDF::Lambert( m_DiffuseReflectance, m_DiffuseColor );
 		}
 
 	private:
@@ -74,13 +79,13 @@ namespace dae
 	class Material_LambertPhong final : public Material
 	{
 	public:
-		Material_LambertPhong(const ColorRGB& diffuseColor, float kd, float ks, float phongExponent) :
-			m_DiffuseColor(diffuseColor), m_DiffuseReflectance(kd), m_SpecularReflectance(ks),
-			m_PhongExponent(phongExponent)
+		Material_LambertPhong( const ColorRGB& diffuseColor, float kd, float ks, float phongExponent ) :
+			m_DiffuseColor( diffuseColor ), m_DiffuseReflectance( kd ), m_SpecularReflectance( ks ),
+			m_PhongExponent( phongExponent )
 		{
 		}
 
-		ColorRGB Shade(const HitRecord& hitRecord = {}, const Vector3& l = {}, const Vector3& v = {}) override
+		ColorRGB Shade( ShadeInfo& shadeInfo, const HitRecord& hitRecord = {}, const Vector3& l = {}, const Vector3& v = {} ) override
 		{
 			// BRDF Linearity
 			return BRDF::Lambert( m_DiffuseReflectance, m_DiffuseColor )
@@ -100,24 +105,33 @@ namespace dae
 	class Material_CookTorrence final : public Material
 	{
 	public:
-		Material_CookTorrence(const ColorRGB& albedo, float metalness, float roughness) :
-			m_Albedo(albedo), m_Metalness(metalness), m_Roughness(roughness)
+		Material_CookTorrence( const ColorRGB& albedo, float metalness, float roughness ) :
+			m_Albedo( albedo ), m_Metalness( metalness ), m_Roughness( roughness )
 		{
 		}
 
-		ColorRGB Shade(const HitRecord& hitRecord = {}, const Vector3& l = {}, const Vector3& v = {}) override
+		ColorRGB Shade( ShadeInfo& shadeInfo, const HitRecord& hitRecord = {}, const Vector3& l = {}, const Vector3& v = {} ) override
 		{
-			const Vector3 h{ (l + v).Normalized( ) };
+			const Vector3 h{ ( l + v ).Normalized( ) };
 
-			const auto fresnel{ BRDF::FresnelFunction_Schlick( h, v, (m_Metalness == 0.f ? ColorRGB{ .04f, .04f, .04f } : m_Albedo) ) };
+			const auto fresnel{ BRDF::FresnelFunction_Schlick( h, v, ( m_Metalness == 0.f ? ColorRGB{ .04f, .04f, .04f } : m_Albedo ) ) };
 			const auto normalDistribution{ BRDF::NormalDistribution_GGX( hitRecord.normal, h, m_Roughness ) };
 			const auto geometricAttenuation{ BRDF::GeometryFunction_Smith( hitRecord.normal, v, l, m_Roughness ) };
 
-			const auto reflipCoefficient{ 1 / (4 * Vector3::Dot( v, hitRecord.normal ) * Vector3::Dot( l, hitRecord.normal )) };
+			const auto reflipCoefficient{ 1 / ( 4 * Vector3::Dot( v, hitRecord.normal ) * Vector3::Dot( l, hitRecord.normal ) ) };
 
-			const auto specular{ normalDistribution * geometricAttenuation * reflipCoefficient * fresnel  };
+			const auto specular{ normalDistribution * geometricAttenuation * reflipCoefficient * fresnel };
 			const auto diffuse{ m_Metalness == 1.f ? ColorRGB{} : BRDF::Lambert( ColorRGB{ 1.f, 1.f, 1.f } - specular, m_Albedo ) };
-			
+
+#ifdef USE_REFLECTIONS
+			if ( m_Metalness == 1.f )
+			{
+				shadeInfo.needsBounce = true;
+				shadeInfo.reflectionRay = { hitRecord.origin + hitRecord.normal * .0001f, Vector3::Reflect( -v, hitRecord.normal ) };
+				shadeInfo.reflectance = powf(1.f - m_Roughness, 2);
+			}
+#endif
+
 			return specular + diffuse;
 		}
 

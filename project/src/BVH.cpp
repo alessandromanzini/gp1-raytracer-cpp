@@ -2,13 +2,13 @@
 
 using namespace dae;
 
-BVHNodeBuilder::BVHNodeBuilder( const std::vector<Vector3>& positions, const std::vector<uint32_t>& indices ) :
+MeshBVHNodeBuilder::MeshBVHNodeBuilder( const std::vector<Vector3>& positions, const std::vector<uint32_t>& indices ) :
 	m_Positions{ positions },
 	m_Indices{ indices }
 {
 }
 
-void BVHNodeBuilder::BuildBVH( BVHNode bvhNode[] )
+void MeshBVHNodeBuilder::BuildBVH( BVHNode bvhNode[] )
 {
 	m_NodesUsed = 1;
 
@@ -21,8 +21,9 @@ void BVHNodeBuilder::BuildBVH( BVHNode bvhNode[] )
 
 	// assign all triangles to root node
 	BVHNode& root = bvhNode[m_RootNodeIdx];
-	root.leftNode = 0;
-	root.firstTriIdx = 0;
+	/*root.leftNode = 0;
+	root.firstTriIdx = 0;*/
+	root.leftFirst = 0;
 	root.triCount = m_Triangles.size();
 
 	if ( root.triCount == 0 ) return;
@@ -33,13 +34,13 @@ void BVHNodeBuilder::BuildBVH( BVHNode bvhNode[] )
 	Subdivide( bvhNode, m_RootNodeIdx );
 }
 
-void BVHNodeBuilder::UpdateNodeBounds( BVHNode bvhNode[], uint32_t nodeIdx )
+void MeshBVHNodeBuilder::UpdateNodeBounds( BVHNode bvhNode[], uint32_t nodeIdx )
 {
 	BVHNode& node = bvhNode[nodeIdx];
 
-	node.aabbMin = m_Triangles[node.firstTriIdx].v0;
-	node.aabbMax = m_Triangles[node.firstTriIdx].v0;
-	for ( uint32_t first = node.firstTriIdx, i = 0; i < node.triCount; i++ )
+	node.aabbMin = m_Triangles[node.leftFirst].v0;
+	node.aabbMax = m_Triangles[node.leftFirst].v0;
+	for ( uint32_t first = node.leftFirst, i = 0; i < node.triCount; i++ )
 	{
 		CentroidTriangle& leafTri{ m_Triangles[GetLookupIdx( first + i )] };
 		node.aabbMin = Vector3::Min( node.aabbMin, leafTri.v0 );
@@ -51,7 +52,7 @@ void BVHNodeBuilder::UpdateNodeBounds( BVHNode bvhNode[], uint32_t nodeIdx )
 	}
 }
 
-void BVHNodeBuilder::Subdivide( BVHNode bvhNode[], uint32_t nodeIdx )
+void MeshBVHNodeBuilder::Subdivide( BVHNode bvhNode[], uint32_t nodeIdx )
 {
 	// terminate recursion
 	BVHNode& node = bvhNode[nodeIdx];
@@ -64,7 +65,7 @@ void BVHNodeBuilder::Subdivide( BVHNode bvhNode[], uint32_t nodeIdx )
 	if ( extent.z > extent[axis] ) axis = 2;
 	float splitPos = node.aabbMin[axis] + extent[axis] * 0.5f;
 
-	uint32_t i = node.firstTriIdx;
+	uint32_t i = node.leftFirst;
 	uint32_t j = i + node.triCount - 1;
 	while ( i <= j )
 	{
@@ -83,16 +84,16 @@ void BVHNodeBuilder::Subdivide( BVHNode bvhNode[], uint32_t nodeIdx )
 	}
 
 	// abort split if one of the sides is empty
-	uint32_t leftCount = i - node.firstTriIdx;
+	uint32_t leftCount = i - node.leftFirst;
 	if ( leftCount == 0 || leftCount == node.triCount ) return;
 	// create child nodes
 	uint32_t leftChildIdx = m_NodesUsed++;
 	uint32_t rightChildIdx = m_NodesUsed++;
-	bvhNode[leftChildIdx].firstTriIdx = node.firstTriIdx;
+	bvhNode[leftChildIdx].leftFirst = node.leftFirst;
 	bvhNode[leftChildIdx].triCount = leftCount;
-	bvhNode[rightChildIdx].firstTriIdx = i;
+	bvhNode[rightChildIdx].leftFirst = i;
 	bvhNode[rightChildIdx].triCount = node.triCount - leftCount;
-	node.leftNode = leftChildIdx;
+	node.leftFirst = leftChildIdx;
 	node.triCount = 0;
 	UpdateNodeBounds( bvhNode, leftChildIdx );
 	UpdateNodeBounds( bvhNode, rightChildIdx );
@@ -101,7 +102,7 @@ void BVHNodeBuilder::Subdivide( BVHNode bvhNode[], uint32_t nodeIdx )
 	Subdivide( bvhNode, rightChildIdx );
 }
 
-uint32_t dae::BVHNodeBuilder::GetLookupIdx( uint32_t idx ) const
+uint32_t dae::MeshBVHNodeBuilder::GetLookupIdx( uint32_t idx ) const
 {
 	return m_Indices[idx*3];
 }

@@ -2,6 +2,8 @@
 #include "SDL.h"
 #include "SDL_surface.h"
 #include <execution>
+#include <random>
+#include <algorithm>
 
 //Project includes
 #include "Renderer.h"
@@ -59,7 +61,6 @@ void Renderer::Render( Scene* pScene ) const
 		RenderPixel( pScene, pixelIdx, camera );
 	}
 #endif
-
 	//@END
 	//Update SDL Surface
 	SDL_UpdateWindowSurface( m_pWindow );
@@ -67,22 +68,26 @@ void Renderer::Render( Scene* pScene ) const
 
 void dae::Renderer::RenderPixel( Scene* pScene, uint32_t pixelIdx, const Camera& camera ) const
 {
-	const uint32_t px{ pixelIdx % m_Width };
-	const uint32_t py{ pixelIdx / m_Width };
-
 	float x, y;
-	ScreenToNDC( x, y, px, py, camera.fovCoefficient );
+	ScreenToNDC( x, y, pixelIdx % m_Width, pixelIdx / m_Width, camera.fovCoefficient );
 
 	// Color to be filled in the buffer
 	ColorRGB finalColor{};
+	ProcessRay( pScene, { camera.origin, camera.cameraToWorld.TransformVector( { x, y, 1.f } ) }, finalColor );
 
+	// Normalize color and update Buffer
+	finalColor.MaxToOne( );
+
+	// Update Color in Buffer
+	UpdateBuffer( finalColor, &m_pBufferPixels[pixelIdx] );
+}
+
+void dae::Renderer::ProcessRay( Scene* pScene, Ray ray, ColorRGB& finalColor, int bounce ) const
+{
 	LightingInfo info{};
+	info.hitRay = std::move( ray );
 
-	// Create Ray and place it on the camera origin
-	info.rayDirection = camera.cameraToWorld.TransformVector( { x, y, 1.f } );
-	info.hitRay = { camera.origin, info.rayDirection };
-
-	pScene->GetClosestHit( info.hitRay, info.closestHit );
+	pScene->GetClosestHit( ray, info.closestHit );
 	if ( info.closestHit.didHit )
 	{
 		// Hit visualization
@@ -95,8 +100,8 @@ void dae::Renderer::RenderPixel( Scene* pScene, uint32_t pixelIdx, const Camera&
 			info.hitToLightDistance = info.hitToLight.Normalize( );
 			info.pLight = &light;
 
-			Ray shadowRay{ info.closestHit.origin, info.hitToLight, .0001f, info.hitToLightDistance };
-			
+			Ray shadowRay{ info.closestHit.origin + info.closestHit.normal * .0005f, info.hitToLight, .0001f, info.hitToLightDistance };
+
 			// if shadow ray doesn't hit anything, we have a clear view of the light
 			// if shadows are not enabled, continue
 			if ( !m_ShadowsEnabled || !pScene->DoesHit( std::move( shadowRay ) ) )
@@ -104,19 +109,23 @@ void dae::Renderer::RenderPixel( Scene* pScene, uint32_t pixelIdx, const Camera&
 				info.observedAreaMeasure = Vector3::Dot( info.closestHit.normal, info.hitToLight );
 				if ( info.observedAreaMeasure >= 0.f )
 				{
+					ShadeInfo shadeInfo{};
+
 					// Set material and call the lighting function to obtain pixel color
 					info.pMaterial = pScene->GetMaterials( )[info.closestHit.materialIndex];
-					m_LightingFn( info, finalColor );
+					m_LightingFn( shadeInfo, info, finalColor );
+
+					// Recursive call for reflections
+					if ( shadeInfo.needsBounce && bounce < MAX_REFLECTION_BOUNCES )
+					{
+						ColorRGB reflectionColor{};
+						ProcessRay( pScene, shadeInfo.reflectionRay, reflectionColor, bounce + 1 );
+						finalColor = finalColor * (1.f - shadeInfo.reflectance) + reflectionColor * shadeInfo.reflectance;
+					}
 				}
 			}
 		}
 	}
-
-	//Normalize color and update Buffer
-	finalColor.MaxToOne( );
-
-	// Update Color in Buffer
-	UpdateBuffer( finalColor, &m_pBufferPixels[pixelIdx] );
 }
 
 bool Renderer::SaveBufferToImage( ) const
@@ -152,30 +161,25 @@ inline void dae::Renderer::ScreenToNDC( float& x, float& y, int px, int py, floa
 	y = ( 1.f - 2.f * ( py + 0.5f ) / m_Height ) * fov;
 }
 
-void dae::Renderer::ObservedAreaLightingFn( const LightingInfo& info, ColorRGB& finalColor ) const
+void dae::Renderer::ObservedAreaLightingFn( ShadeInfo& shadeInfo, const LightingInfo& info, ColorRGB& finalColor ) const
 {
 	finalColor += ColorRGB{ 1.f, 1.f, 1.f } * info.observedAreaMeasure;
 }
 
-void dae::Renderer::RadianceLightingFn( const LightingInfo& info, ColorRGB& finalColor ) const
+void dae::Renderer::RadianceLightingFn( ShadeInfo& shadeInfo, const LightingInfo& info, ColorRGB& finalColor ) const
 {
 	finalColor += LightUtils::GetRadiance( *info.pLight, powf( info.hitToLightDistance, 2 ) );
 }
 
-void dae::Renderer::BRDFLightingFn( const LightingInfo& info, ColorRGB& finalColor ) const
+void dae::Renderer::BRDFLightingFn( ShadeInfo& shadeInfo, const LightingInfo& info, ColorRGB& finalColor ) const
 {
-	finalColor += info.pMaterial->Shade( info.closestHit, info.hitToLight, -info.hitRay.direction );
+	finalColor += info.pMaterial->Shade( shadeInfo, info.closestHit, info.hitToLight, -info.hitRay.direction );
 }
 
-void dae::Renderer::BVHLightingFn( const LightingInfo& info, ColorRGB& finalColor ) const
-{
-	CombinedLightingFn( info, finalColor );
-}
-
-void dae::Renderer::CombinedLightingFn( const LightingInfo& info, ColorRGB& finalColor ) const
+void dae::Renderer::CombinedLightingFn( ShadeInfo& shadeInfo, const LightingInfo& info, ColorRGB& finalColor ) const
 {
 	const ColorRGB Ergb{ LightUtils::GetRadiance( *info.pLight, powf( info.hitToLightDistance, 2 ) ) };
-	const ColorRGB BRDFrgb{ info.pMaterial->Shade( info.closestHit, info.hitToLight, -info.hitRay.direction ) };
+	const ColorRGB BRDFrgb{ info.pMaterial->Shade( shadeInfo, info.closestHit, info.hitToLight, -info.hitRay.direction ) };
 
 	finalColor += Ergb * BRDFrgb * info.observedAreaMeasure;
 }
@@ -197,19 +201,16 @@ void dae::Renderer::SetLightingMode( LightingMode mode )
 	switch ( m_LightingMode )
 	{
 	case LightingMode::ObservedArea:
-		m_LightingFn = std::bind( &Renderer::ObservedAreaLightingFn, this, std::placeholders::_1, std::placeholders::_2 );
+		m_LightingFn = std::bind( &Renderer::ObservedAreaLightingFn, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3 );
 		break;
 	case LightingMode::Radiance:
-		m_LightingFn = std::bind( &Renderer::RadianceLightingFn, this, std::placeholders::_1, std::placeholders::_2 );
+		m_LightingFn = std::bind( &Renderer::RadianceLightingFn, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3 );
 		break;
 	case LightingMode::BRDF:
-		m_LightingFn = std::bind( &Renderer::BRDFLightingFn, this, std::placeholders::_1, std::placeholders::_2 );
-		break;
-	case LightingMode::BVH:
-		m_LightingFn = std::bind( &Renderer::BVHLightingFn, this, std::placeholders::_1, std::placeholders::_2 );
+		m_LightingFn = std::bind( &Renderer::BRDFLightingFn, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3 );
 		break;
 	case LightingMode::Combined:
-		m_LightingFn = std::bind( &Renderer::CombinedLightingFn, this, std::placeholders::_1, std::placeholders::_2 );
+		m_LightingFn = std::bind( &Renderer::CombinedLightingFn, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3 );
 		break;
 	}
 }
