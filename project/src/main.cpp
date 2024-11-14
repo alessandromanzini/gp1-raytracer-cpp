@@ -16,27 +16,24 @@
 #include "Renderer.h"
 #include "Scene.h"
 
-constexpr bool SIMPLE_OUTPUT{ false };
+//#define SIMPLE_OUTPUT;
 
 using namespace dae;
 
 static void LogSceneInfo( const Scene* pScene, const std::string& status, float dFPS = 0.f )
 {
-	if constexpr ( SIMPLE_OUTPUT )
-	{
-		std::cout << pScene->GetSceneName( ) << " - FPS: " << dFPS << std::endl;
-		return;
-	}
-	else
-	{
-		system( "cls" );
-		std::cout << std::left;
-		std::cout << "+-------------------------------------------------+" << std::endl;
-		std::cout << "| Scene:  " << std::setw( 40 ) << pScene->GetSceneName() << "|" << std::endl;
-		std::cout << "| Mode:   " << std::setw( 40 ) << status << "|" << std::endl;
-		std::cout << "| FPS:    " << std::setw( 40 ) << dFPS << "|" << std::endl;
-		std::cout << "+-------------------------------------------------+" << std::endl;
-	}
+#ifdef SIMPLE_OUTPUT 
+	std::cout << pScene->GetSceneName( ) << " - FPS: " << dFPS << std::endl;
+	return;
+#else
+	system( "cls" );
+	std::cout << std::left;
+	std::cout << "+-------------------------------------------------+" << std::endl;
+	std::cout << "| Scene:  " << std::setw( 40 ) << pScene->GetSceneName() << "|" << std::endl;
+	std::cout << "| Mode:   " << std::setw( 40 ) << status << "|" << std::endl;
+	std::cout << "| FPS:    " << std::setw( 40 ) << dFPS << "|" << std::endl;
+	std::cout << "+-------------------------------------------------+" << std::endl;
+#endif
 }
 
 static void LogSceneInfo( const Scene* pScene, LightingMode lightingMode, float dFPS )

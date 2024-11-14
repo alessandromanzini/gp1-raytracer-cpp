@@ -36,8 +36,6 @@ namespace dae
 		Triangle(const Vector3& _v0, const Vector3& _v1, const Vector3& _v2, const Vector3& _normal) :
 			v0{ _v0 }, v1{ _v1 }, v2{ _v2 }, normal{ _normal.Normalized() } 
 		{
-			//Calculate Centroid
-			centroid = ( v0 + v1 + v2 ) / 3.f;
 		}
 
 		Triangle(const Vector3& _v0, const Vector3& _v1, const Vector3& _v2) :
@@ -46,15 +44,11 @@ namespace dae
 			const Vector3 edgeV0V1 = v1 - v0;
 			const Vector3 edgeV0V2 = v2 - v0;
 			normal = Vector3::Cross(edgeV0V1, edgeV0V2).Normalized();
-
-			//Calculate Centroid
-			centroid = ( v0 + v1 + v2 ) / 3.f;
 		}
 
 		Vector3 v0{};
 		Vector3 v1{};
 		Vector3 v2{};
-		Vector3 centroid{};
 
 		Vector3 normal{};
 
@@ -63,10 +57,25 @@ namespace dae
 	};
 
 #pragma region BVH
+	struct CentroidTriangle
+	{
+		CentroidTriangle( ) = default;
+		CentroidTriangle( const Vector3& v0, const Vector3& v1, const Vector3& v2 ) 
+			: v0( v0 ), v1( v1 ), v2( v2 )
+			, centroid( ( v0 + v1 + v2 ) / 3.f )
+		{
+		}
+
+		Vector3 v0;
+		Vector3 v1;
+		Vector3 v2;
+		Vector3 centroid;
+	};
+
 	struct BVHNode
 	{
 		dae::Vector3 aabbMin, aabbMax;
-		int leftNode, firstTriIdx, triCount; // todo leftFirst optimization
+		uint32_t leftNode, firstTriIdx, triCount; // todo leftFirst optimization
 
 		bool isLeaf( ) const
 		{
@@ -77,30 +86,30 @@ namespace dae
 	class BVHNodeBuilder
 	{
 	public:
-		BVHNodeBuilder( const std::vector<Vector3>& positions, const std::vector<int>& indices );
+		BVHNodeBuilder( const std::vector<Vector3>& positions, const std::vector<uint32_t>& indices );
 
 		void BuildBVH( BVHNode bvhNode[] );
 
 	private:
 		const std::vector<Vector3>& m_Positions;
-		std::vector<int> m_Indices;
+		std::vector<uint32_t> m_Indices;
 
-		std::vector<Triangle> m_Triangles{};
+		std::vector<CentroidTriangle> m_Triangles{};
 
-		static const int m_RootNodeIdx = 0;
-		int m_NodesUsed = 1;
+		static const uint32_t m_RootNodeIdx = 0;
+		uint32_t m_NodesUsed = 1;
 
-		void UpdateNodeBounds( BVHNode bvhNode[], uint64_t nodeIdx );
-		void Subdivide( BVHNode bvhNode[], uint64_t nodeIdx );
+		void UpdateNodeBounds( BVHNode bvhNode[], uint32_t nodeIdx );
+		void Subdivide( BVHNode bvhNode[], uint32_t nodeIdx );
 
-		int GetLookupIdx( int idx ) const;
+		uint32_t GetLookupIdx( uint32_t idx ) const;
 	};
 #pragma endregion
 
 	struct TriangleMesh
 	{
 		TriangleMesh() = default;
-		TriangleMesh(const std::vector<Vector3>& _positions, const std::vector<int>& _indices, TriangleCullMode _cullMode) :
+		TriangleMesh(const std::vector<Vector3>& _positions, const std::vector<uint32_t>& _indices, TriangleCullMode _cullMode) :
 			positions( _positions ), indices( _indices ), cullMode( _cullMode )
 		{
 			//Calculate Normals
@@ -118,7 +127,7 @@ namespace dae
 			}
 		}
 
-		TriangleMesh(const std::vector<Vector3>& _positions, const std::vector<int>& _indices, const std::vector<Vector3>& _normals, TriangleCullMode _cullMode) :
+		TriangleMesh(const std::vector<Vector3>& _positions, const std::vector<uint32_t>& _indices, const std::vector<Vector3>& _normals, TriangleCullMode _cullMode) :
 			positions(_positions), indices(_indices), normals(_normals), cullMode(_cullMode)
 		{
 			UpdateTransforms();
@@ -126,7 +135,7 @@ namespace dae
 
 		std::vector<Vector3> positions{};
 		std::vector<Vector3> normals{};
-		std::vector<int> indices{};
+		std::vector<uint32_t> indices{};
 		unsigned char materialIndex{};
 
 		BVHNode* pBVHRoot{ nullptr };

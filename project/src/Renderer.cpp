@@ -96,7 +96,7 @@ void dae::Renderer::RenderPixel( Scene* pScene, uint32_t pixelIdx, const Camera&
 			info.pLight = &light;
 
 			Ray shadowRay{ info.closestHit.origin, info.hitToLight, .0001f, info.hitToLightDistance };
-
+			
 			// if shadow ray doesn't hit anything, we have a clear view of the light
 			// if shadows are not enabled, continue
 			if ( !m_ShadowsEnabled || !pScene->DoesHit( std::move( shadowRay ) ) )

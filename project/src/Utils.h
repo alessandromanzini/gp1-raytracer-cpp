@@ -296,7 +296,7 @@ namespace dae
 		//Just parses vertices and indices
 #pragma warning(push)
 #pragma warning(disable : 4505) //Warning unreferenced local function
-		static bool ParseOBJ(const std::string& filename, std::vector<Vector3>& positions, std::vector<Vector3>& normals, std::vector<int>& indices)
+		static bool ParseOBJ(const std::string& filename, std::vector<Vector3>& positions, std::vector<Vector3>& normals, std::vector<uint32_t>& indices)
 		{
 			std::ifstream file(filename);
 			if (!file)
@@ -325,9 +325,9 @@ namespace dae
 					float i0, i1, i2;
 					file >> i0 >> i1 >> i2;
 
-					indices.push_back((int)i0 - 1);
-					indices.push_back((int)i1 - 1);
-					indices.push_back((int)i2 - 1);
+					indices.push_back((uint32_t)i0 - 1);
+					indices.push_back((uint32_t)i1 - 1);
+					indices.push_back((uint32_t)i2 - 1);
 				}
 				//read till end of line and ignore all remaining chars
 				file.ignore(1000, '\n');
