@@ -39,7 +39,7 @@ static void LogSceneInfo( const Scene* pScene, const std::string& status, float 
 	}
 }
 
-static constexpr void LogSceneInfo( const Scene* pScene, LightingMode lightingMode, float dFPS )
+static void LogSceneInfo( const Scene* pScene, LightingMode lightingMode, float dFPS )
 {
 	std::string status{};
 	switch ( lightingMode )
