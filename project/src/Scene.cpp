@@ -381,20 +381,20 @@ namespace dae
 		// Meshes
 		const Triangle baseTriangle{ { -.75f, 1.5f, 0.f }, { .75f, 0.f, 0.f }, { -.75f, 0.f, 0.f } };
 
-		m_pMeshes[0] = AddTriangleMesh( TriangleCullMode::BackFaceCulling, matLambert_White );
-		m_pMeshes[0]->AppendTriangle( baseTriangle, true );
-		m_pMeshes[0]->Translate( { -1.75f, 4.5f, 0.f } );
-		m_pMeshes[0]->UpdateTransforms( );
+		pMeshes[0] = AddTriangleMesh( TriangleCullMode::BackFaceCulling, matLambert_White );
+		pMeshes[0]->AppendTriangle( baseTriangle, true );
+		pMeshes[0]->Translate( { -1.75f, 4.5f, 0.f } );
+		pMeshes[0]->UpdateTransforms( );
 
-		m_pMeshes[1] = AddTriangleMesh( TriangleCullMode::FrontFaceCulling, matLambert_White );
-		m_pMeshes[1]->AppendTriangle( baseTriangle, true );
-		m_pMeshes[1]->Translate( { 0.f, 4.5f, 0.f } );
-		m_pMeshes[1]->UpdateTransforms( );
+		pMeshes[1] = AddTriangleMesh( TriangleCullMode::FrontFaceCulling, matLambert_White );
+		pMeshes[1]->AppendTriangle( baseTriangle, true );
+		pMeshes[1]->Translate( { 0.f, 4.5f, 0.f } );
+		pMeshes[1]->UpdateTransforms( );
 
-		m_pMeshes[2] = AddTriangleMesh( TriangleCullMode::NoCulling, matLambert_White );
-		m_pMeshes[2]->AppendTriangle( baseTriangle, true );
-		m_pMeshes[2]->Translate( { 1.75f, 4.5f, 0.f } );
-		m_pMeshes[2]->UpdateTransforms( );
+		pMeshes[2] = AddTriangleMesh( TriangleCullMode::NoCulling, matLambert_White );
+		pMeshes[2]->AppendTriangle( baseTriangle, true );
+		pMeshes[2]->Translate( { 1.75f, 4.5f, 0.f } );
+		pMeshes[2]->UpdateTransforms( );
 
 		// Lights
 		AddPointLight( { 0.f, 5.f, 5.f }, 50.f, { 1.f, .61f, .45f } );   // Backlight
@@ -409,8 +409,8 @@ namespace dae
 		const auto yawAngle{ ( cos( pTimer->GetTotal( ) ) + 1.f ) / 2.f * PI_2 };
 		for ( int i{}; i < 3; ++i )
 		{
-			m_pMeshes[i]->RotateY( yawAngle );
-			m_pMeshes[i]->UpdateTransforms( );
+			pMeshes[i]->RotateY( yawAngle );
+			pMeshes[i]->UpdateTransforms( );
 		}
 	}
 
@@ -438,9 +438,6 @@ namespace dae
 			pMesh->indices );
 
 		pMesh->Scale( { 2.f, 2.f, 2.f } );
-
-		//Update SlabTest AABB
-		pMesh->UpdateAABB( );
 
 		pMesh->UpdateTransforms( );
 

@@ -7,6 +7,7 @@ set(SOURCES
     "src/Timer.cpp"
     "src/Vector3.cpp"
     "src/Vector4.cpp"
+    "src/BVH.cpp"
 )
 
 # Create the executable

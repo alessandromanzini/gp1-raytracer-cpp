@@ -122,25 +122,11 @@ namespace dae
 
 			totalYaw += mouseX * speed;
 			totalPitch += mouseY * speed;
-			NormalizeRotationAngle( totalYaw );
-			NormalizeRotationAngle( totalPitch );
+
+			// Clamp pitch to prevent flipping
+			totalPitch = std::clamp( totalPitch, -PI_2 + FLT_EPSILON, PI_2 - FLT_EPSILON );
 
 			ApplyCameraRotations( );
-		}
-
-		static inline void NormalizeRotationAngle( float& angle )
-		{
-			// Normalize the angle to be between -2PI and 2PI
-			if ( angle == 0.f )
-			{
-				return;
-			}
-
-			const float direction{ abs( angle ) / angle };
-			while ( angle * direction > 2 * PI )
-			{
-				angle -= 2 * PI * direction;
-			}
 		}
 
 	};

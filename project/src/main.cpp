@@ -8,15 +8,69 @@
 
 //Standard includes
 #include <iostream>
+#include <iomanip>
+#include <vector>
 
 //Project includes
 #include "Timer.h"
 #include "Renderer.h"
 #include "Scene.h"
 
-#define SCENE_SWITCH true;
+constexpr bool SIMPLE_OUTPUT{ false };
 
 using namespace dae;
+
+static void LogSceneInfo( const Scene* pScene, const std::string& status, float dFPS = 0.f )
+{
+	if constexpr ( SIMPLE_OUTPUT )
+	{
+		std::cout << pScene->GetSceneName( ) << " - FPS: " << dFPS << std::endl;
+		return;
+	}
+	else
+	{
+		system( "cls" );
+		std::cout << std::left;
+		std::cout << "+-------------------------------------------------+" << std::endl;
+		std::cout << "| Scene:  " << std::setw( 40 ) << pScene->GetSceneName() << "|" << std::endl;
+		std::cout << "| Mode:   " << std::setw( 40 ) << status << "|" << std::endl;
+		std::cout << "| FPS:    " << std::setw( 40 ) << dFPS << "|" << std::endl;
+		std::cout << "+-------------------------------------------------+" << std::endl;
+	}
+}
+
+static constexpr void LogSceneInfo( const Scene* pScene, LightingMode lightingMode, float dFPS )
+{
+	std::string status{};
+	switch ( lightingMode )
+	{
+	case dae::LightingMode::ObservedArea:
+		status = "Observed Area";
+		break;
+	case dae::LightingMode::Radiance:
+		status = "Radiance";
+		break;
+	case dae::LightingMode::BRDF:
+		status = "BRDF";
+		break;
+	case dae::LightingMode::BVH:
+		status = "BVH";
+		break;
+	case dae::LightingMode::Combined:
+		status = "Combined";
+		break;
+	}
+	LogSceneInfo( pScene, status, dFPS );
+}
+
+static void LoadScene( Scene** pScene, const std::function<Scene* ( )>& fnFactory )
+{
+	delete *pScene;
+	*pScene = fnFactory();
+
+	LogSceneInfo( *pScene, "Initializing" );
+	( *pScene )->Initialize( );
+}
 
 void ShutDown( SDL_Window* pWindow )
 {
@@ -49,11 +103,21 @@ int main( int argc, char* args[] )
 	const auto pTimer = new Timer( );
 	const auto pRenderer = new Renderer( pWindow );
 
-#if SCENE_SWITCH
-	const auto pScene = new Scene_W4_BunnyScene( );
-#else
-	const auto pScene = new Scene_W4_ReferenceScene( );
-#endif
+	size_t sceneIndex = 0;
+	// Vector of factory functions to create each type on demand
+	std::vector<std::function<Scene* ( )>> sceneFactories{
+		[]( ) -> auto*
+		{
+			return new Scene_W4_ReferenceScene( );
+		},
+		[]( ) -> auto*
+		{
+			return new Scene_W4_BunnyScene( );
+		}
+	};
+
+	auto pScene = sceneFactories.at( 0 )();
+
 	pScene->Initialize( );
 
 	//Start loop
@@ -77,18 +141,35 @@ int main( int argc, char* args[] )
 				isLooping = false;
 				break;
 			case SDL_KEYUP:
-				if ( e.key.keysym.scancode == SDL_SCANCODE_X )
+				switch ( e.key.keysym.scancode )
 				{
+				case SDL_SCANCODE_X:
 					takeScreenshot = true;
-				}
-				else if ( e.key.keysym.scancode == SDL_SCANCODE_F2 )
-				{
+					break;
+
+				case SDL_SCANCODE_F2:
 					pRenderer->ToggleShadows( );
-				}
-				else if ( e.key.keysym.scancode == SDL_SCANCODE_F3 )
-				{
+					break;
+				case SDL_SCANCODE_F3:
 					pRenderer->ToggleLightingMode( );
+					break;
+				case SDL_SCANCODE_UP:
+					sceneIndex = ( sceneIndex + 1 ) % sceneFactories.size( );
+					LoadScene( &pScene, sceneFactories.at( sceneIndex ) );
+					break;
+				case SDL_SCANCODE_DOWN:
+					if ( sceneIndex < 1 )
+					{
+						sceneIndex = sceneFactories.size( ) - 1;
+					}
+					else
+					{
+						--sceneIndex;
+					}
+					LoadScene( &pScene, sceneFactories.at( sceneIndex ) );
+					break;
 				}
+
 				break;
 			}
 		}
@@ -105,7 +186,7 @@ int main( int argc, char* args[] )
 		if ( printTimer >= 1.f )
 		{
 			printTimer = 0.f;
-			std::cout << "dFPS: " << pTimer->GetdFPS( ) << std::endl;
+			LogSceneInfo( pScene, pRenderer->GetLightingMode(), pTimer->GetdFPS( ) );
 		}
 
 		//Save screenshot after full render
@@ -119,16 +200,6 @@ int main( int argc, char* args[] )
 		}
 	}
 	pTimer->Stop( );
-
-	// Todo (1) - Test Vector3
-	float dotResult{};
-	dotResult = Vector3::Dot( Vector3::UnitX, Vector3::UnitX ); // 1
-	dotResult = Vector3::Dot( Vector3::UnitX, -Vector3::UnitX ); // -1
-	dotResult = Vector3::Dot( Vector3::UnitX, Vector3::UnitY ); // 0
-
-	Vector3 crossResult{};
-	crossResult = Vector3::Cross( Vector3::UnitZ, Vector3::UnitX ); // (0, 1, 0)
-	crossResult = Vector3::Cross( Vector3::UnitX, Vector3::UnitZ ); // (0, -1, 0)
 
 	//Shutdown "framework"
 	delete pScene;

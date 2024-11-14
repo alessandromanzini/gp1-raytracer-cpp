@@ -156,28 +156,54 @@ namespace dae
 		}
 #pragma endregion
 #pragma region TriangeMesh HitTest
-		inline bool SlabTest_TriangleMesh( const TriangleMesh& mesh, const Ray& ray )
+		inline bool SlabTest_TriangleMesh( const Vector3& minAABB, const Vector3& maxAABB, const Ray& ray )
 		{
-			const float tx1{ ( mesh.transformedMinAABB.x - ray.origin.x ) / ray.direction.x };
-			const float tx2{ ( mesh.transformedMaxAABB.x - ray.origin.x ) / ray.direction.x };
+			const float tx1{ ( minAABB.x - ray.origin.x ) / ray.direction.x };
+			const float tx2{ ( maxAABB.x - ray.origin.x ) / ray.direction.x };
 
-			const float ty1{ ( mesh.transformedMinAABB.y - ray.origin.y ) / ray.direction.y };
-			const float ty2{ ( mesh.transformedMaxAABB.y - ray.origin.y ) / ray.direction.y };
+			float tmin = std::min( tx1, tx2 );
+			float tmax = std::max( tx1, tx2 );
 
-			const float tz1{ ( mesh.transformedMinAABB.z - ray.origin.z ) / ray.direction.z };
-			const float tz2{ ( mesh.transformedMaxAABB.z - ray.origin.z ) / ray.direction.z };
+			const float ty1{ ( minAABB.y - ray.origin.y ) / ray.direction.y };
+			const float ty2{ ( maxAABB.y - ray.origin.y ) / ray.direction.y };
 
-			// Get the maximum between the minimums and the minimum between the maximums
-			float tmin = std::max( { std::min( tx1,tx2 ), std::min( ty1,ty2 ), std::min( tz1, tz2 ) } );
-			float tmax = std::min( { std::max( tx1,tx2 ), std::max( ty1, ty2 ), std::max( tz1, tz2 ) } );
+			tmin = std::max( tmin, std::min( ty1, ty2 ) );
+			tmax = std::min( tmax, std::max( ty1, ty2 ) );
+
+			const float tz1{ ( minAABB.z - ray.origin.z ) / ray.direction.z };
+			const float tz2{ ( maxAABB.z - ray.origin.z ) / ray.direction.z };
+
+			tmin = std::max( tmin, std::min( tz1, tz2 ) );
+			tmax = std::min( tmax, std::max( tz1, tz2 ) );
 
 			return tmax > 0 && tmax >= tmin;
 		}
 
+		inline bool BHV_TriangleMesh( BVHNode bvhNode[], const Ray& ray, const int nodeIdx = 0 )
+		{
+			BVHNode& node = bvhNode[nodeIdx];
+			if ( !SlabTest_TriangleMesh( node.aabbMin, node.aabbMax, ray ) )
+			{
+				return false;
+			}
+			// If it's a leaf node and SlabTest was positive, ray is inside a triangle
+			if ( node.isLeaf( ) )
+			{
+				return true;
+			}
+			else
+			{
+				// else dig deeper. quicksort type of algorithm
+				bool confirm = BHV_TriangleMesh( bvhNode, ray, node.leftNode ) ||
+					BHV_TriangleMesh( bvhNode, ray, node.leftNode + 1 );
+				return confirm;
+			}
+		}
+
 		inline bool HitTest_TriangleMesh(const TriangleMesh& mesh, const Ray& ray, HitRecord& hitRecord, bool ignoreHitRecord = false)
 		{
-			// If slabtest fails, exits
-			if ( !SlabTest_TriangleMesh( mesh, ray ) )
+			// If BHV fails, exits
+			if ( !BHV_TriangleMesh( mesh.pBVHRoot, ray ) )
 			{
 				return false;
 			}

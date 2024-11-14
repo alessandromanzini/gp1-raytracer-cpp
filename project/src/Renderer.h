@@ -12,6 +12,15 @@ namespace dae
 {
 	class Scene;
 
+	enum class LightingMode
+	{
+		ObservedArea, // Lambert Cosine Law
+		Radiance,	  // Incident Radiance
+		BRDF,		  // Scattering of the light
+		BVH,		  // Bounding Volume Hierarchy
+		Combined	  // Combination of all
+	};
+
 	class Renderer final
 	{
 	public:
@@ -29,16 +38,10 @@ namespace dae
 
 		void ToggleShadows( );
 		void ToggleLightingMode( );
+
+		LightingMode GetLightingMode( );
 		
 	private:
-		enum class LightingMode
-		{
-			ObservedArea, // Lambert Cosine Law
-			Radiance,	  // Incident Radiance
-			BRDF,		  // Scattering of the light
-			Combined	  // Combination of all
-		};
-
 		LightingMode m_LightingMode{ LightingMode::Combined };
 		std::function<void( const LightingInfo&, ColorRGB& )> m_LightingFn{};
 		bool m_ShadowsEnabled{ true };
@@ -60,6 +63,7 @@ namespace dae
 		void ObservedAreaLightingFn( const LightingInfo& info, ColorRGB& finalColor ) const;
 		void RadianceLightingFn( const LightingInfo& info, ColorRGB& finalColor ) const;
 		void BRDFLightingFn( const LightingInfo& info, ColorRGB& finalColor ) const;
+		void BVHLightingFn( const LightingInfo& info, ColorRGB& finalColor ) const;
 		void CombinedLightingFn( const LightingInfo& info, ColorRGB& finalColor ) const;
 
 		void UpdateBuffer( dae::ColorRGB& finalColor, uint32_t* const pBufferHead ) const;

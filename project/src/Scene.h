@@ -44,6 +44,11 @@ namespace dae
 		const std::vector<Light>& GetLights() const { return m_Lights; }
 		const std::vector<Material*> GetMaterials() const { return m_Materials; }
 
+		const std::string& GetSceneName( ) const
+		{
+			return sceneName;
+		}
+
 	protected:
 		std::string	sceneName;
 
@@ -167,7 +172,7 @@ namespace dae
 		virtual void Update( dae::Timer* pTimer ) override;
 
 	private:
-		TriangleMesh* m_pMeshes[3];
+		TriangleMesh* pMeshes[3];
 
 	};
 

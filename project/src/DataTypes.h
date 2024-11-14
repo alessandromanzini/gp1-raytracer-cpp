@@ -34,7 +34,11 @@ namespace dae
 	{
 		Triangle() = default;
 		Triangle(const Vector3& _v0, const Vector3& _v1, const Vector3& _v2, const Vector3& _normal) :
-			v0{ _v0 }, v1{ _v1 }, v2{ _v2 }, normal{ _normal.Normalized() } {}
+			v0{ _v0 }, v1{ _v1 }, v2{ _v2 }, normal{ _normal.Normalized() } 
+		{
+			//Calculate Centroid
+			centroid = ( v0 + v1 + v2 ) / 3.f;
+		}
 
 		Triangle(const Vector3& _v0, const Vector3& _v1, const Vector3& _v2) :
 			v0{ _v0 }, v1{ _v1 }, v2{ _v2 }
@@ -42,11 +46,15 @@ namespace dae
 			const Vector3 edgeV0V1 = v1 - v0;
 			const Vector3 edgeV0V2 = v2 - v0;
 			normal = Vector3::Cross(edgeV0V1, edgeV0V2).Normalized();
+
+			//Calculate Centroid
+			centroid = ( v0 + v1 + v2 ) / 3.f;
 		}
 
 		Vector3 v0{};
 		Vector3 v1{};
 		Vector3 v2{};
+		Vector3 centroid{};
 
 		Vector3 normal{};
 
@@ -54,17 +62,60 @@ namespace dae
 		unsigned char materialIndex{};
 	};
 
+#pragma region BVH
+	struct BVHNode
+	{
+		dae::Vector3 aabbMin, aabbMax;
+		int leftNode, firstTriIdx, triCount; // todo leftFirst optimization
+
+		bool isLeaf( ) const
+		{
+			return triCount > 0;
+		}
+	};
+
+	class BVHNodeBuilder
+	{
+	public:
+		BVHNodeBuilder( const std::vector<Vector3>& positions, const std::vector<int>& indices );
+
+		void BuildBVH( BVHNode bvhNode[] );
+
+	private:
+		const std::vector<Vector3>& m_Positions;
+		std::vector<int> m_Indices;
+
+		std::vector<Triangle> m_Triangles{};
+
+		static const int m_RootNodeIdx = 0;
+		int m_NodesUsed = 1;
+
+		void UpdateNodeBounds( BVHNode bvhNode[], uint64_t nodeIdx );
+		void Subdivide( BVHNode bvhNode[], uint64_t nodeIdx );
+
+		int GetLookupIdx( int idx ) const;
+	};
+#pragma endregion
+
 	struct TriangleMesh
 	{
 		TriangleMesh() = default;
 		TriangleMesh(const std::vector<Vector3>& _positions, const std::vector<int>& _indices, TriangleCullMode _cullMode) :
-			positions(_positions), indices(_indices), cullMode(_cullMode)
+			positions( _positions ), indices( _indices ), cullMode( _cullMode )
 		{
 			//Calculate Normals
 			CalculateNormals();
 
 			//Update Transforms
 			UpdateTransforms();
+		}
+		~TriangleMesh( )
+		{
+			if ( pBVHRoot )
+			{
+				delete[] pBVHRoot;
+				pBVHRoot = nullptr;
+			}
 		}
 
 		TriangleMesh(const std::vector<Vector3>& _positions, const std::vector<int>& _indices, const std::vector<Vector3>& _normals, TriangleCullMode _cullMode) :
@@ -78,17 +129,13 @@ namespace dae
 		std::vector<int> indices{};
 		unsigned char materialIndex{};
 
+		BVHNode* pBVHRoot{ nullptr };
+
 		TriangleCullMode cullMode{ TriangleCullMode::BackFaceCulling };
 
 		Matrix rotationTransform{};
 		Matrix translationTransform{};
 		Matrix scaleTransform{};
-
-		Vector3 minAABB{};
-		Vector3 maxAABB{};
-
-		Vector3 transformedMinAABB{};
-		Vector3 transformedMaxAABB{};
 
 		std::vector<Vector3> transformedPositions{};
 		std::vector<Vector3> transformedNormals{};
@@ -153,57 +200,11 @@ namespace dae
 			}
 		}
 
-		void UpdateAABB( )
+		void UpdateBVH( )
 		{
-			if ( positions.size( ) > 0 )
-			{
-				minAABB = positions[0];
-				maxAABB = positions[0];
-
-				for ( const auto& pos : positions )
-				{
-					minAABB = Vector3::Min( minAABB, pos );
-					maxAABB = Vector3::Max( maxAABB, pos );
-				}
-			}
-		}
-
-		void UpdateTransformedAABB( const Matrix& finalTransform )
-		{
-			Vector3 tMinAABB{ finalTransform.TransformPoint( minAABB ) };
-			Vector3 tMaxAABB{ tMinAABB };
-
-			//(xmax, ymin, zmin)
-			Vector3 tAABB{ finalTransform.TransformPoint( { maxAABB.x, minAABB.y, minAABB.z } ) };
-			tMinAABB = Vector3::Min( tMinAABB, tAABB );
-			tMaxAABB = Vector3::Max( tMaxAABB, tAABB );
-			//(xmax, ymin, zmax)
-			tAABB = finalTransform.TransformPoint( { maxAABB.x, minAABB.y, maxAABB.z } );
-			tMinAABB = Vector3::Min( tMinAABB, tAABB );
-			tMaxAABB = Vector3::Max( tMaxAABB, tAABB );
-			//(xmin, ymin, zmax)
-			tAABB = finalTransform.TransformPoint( { minAABB.x, minAABB.y, maxAABB.z } );
-			tMinAABB = Vector3::Min( tMinAABB, tAABB );
-			tMaxAABB = Vector3::Max( tMaxAABB, tAABB );
-			//(xmin, ymax, zmin)
-			tAABB = finalTransform.TransformPoint( { minAABB.x, maxAABB.y, minAABB.z } );
-			tMinAABB = Vector3::Min( tMinAABB, tAABB );
-			tMaxAABB = Vector3::Max( tMaxAABB, tAABB );
-			//(xmax, ymax, zmin)
-			tAABB = finalTransform.TransformPoint( { maxAABB.x, maxAABB.y, minAABB.z } );
-			tMinAABB = Vector3::Min( tMinAABB, tAABB );
-			tMaxAABB = Vector3::Max( tMaxAABB, tAABB );
-			//(xmin, ymax, zmax)
-			tAABB = finalTransform.TransformPoint( { minAABB.x, maxAABB.y, maxAABB.z } );
-			tMinAABB = Vector3::Min( tMinAABB, tAABB );
-			tMaxAABB = Vector3::Max( tMaxAABB, tAABB );
-			//(xmax, ymax, zmax)
-			tAABB = finalTransform.TransformPoint( { maxAABB.x, maxAABB.y, maxAABB.z } );
-			tMinAABB = Vector3::Min( tMinAABB, tAABB );
-			tMaxAABB = Vector3::Max( tMaxAABB, tAABB );
-
-			transformedMinAABB = tMinAABB;
-			transformedMaxAABB = tMaxAABB;
+			pBVHRoot = new BVHNode[ ( indices.size( ) / 3 ) * 2 - 1 ];
+			BVHNodeBuilder builder{ transformedPositions, indices };
+			builder.BuildBVH( pBVHRoot );
 		}
 
 		void UpdateTransforms()
@@ -232,7 +233,7 @@ namespace dae
 				transformedNormals.emplace_back( rtsMatrix.TransformVector( normal ).Normalized( ) );
 			}
 
-			UpdateTransformedAABB( rtsMatrix );
+			UpdateBVH( );
 		}
 	};
 #pragma endregion

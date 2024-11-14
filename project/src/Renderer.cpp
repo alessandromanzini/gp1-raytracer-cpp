@@ -133,12 +133,17 @@ void dae::Renderer::ToggleLightingMode( )
 {
 	if ( m_LightingMode == LightingMode::Combined )
 	{
-		SetLightingMode( LightingMode::ObservedArea );
+		SetLightingMode( LightingMode( static_cast<int>( 0 ) ) );
 	}
 	else
 	{
 		SetLightingMode( LightingMode( static_cast<int>( m_LightingMode ) + 1 ) );
 	}
+}
+
+LightingMode dae::Renderer::GetLightingMode( )
+{
+	return m_LightingMode;
 }
 
 inline void dae::Renderer::ScreenToNDC( float& x, float& y, int px, int py, float fov ) const
@@ -160,6 +165,11 @@ void dae::Renderer::RadianceLightingFn( const LightingInfo& info, ColorRGB& fina
 void dae::Renderer::BRDFLightingFn( const LightingInfo& info, ColorRGB& finalColor ) const
 {
 	finalColor += info.pMaterial->Shade( info.closestHit, info.hitToLight, -info.hitRay.direction );
+}
+
+void dae::Renderer::BVHLightingFn( const LightingInfo& info, ColorRGB& finalColor ) const
+{
+	CombinedLightingFn( info, finalColor );
 }
 
 void dae::Renderer::CombinedLightingFn( const LightingInfo& info, ColorRGB& finalColor ) const
@@ -194,6 +204,9 @@ void dae::Renderer::SetLightingMode( LightingMode mode )
 		break;
 	case LightingMode::BRDF:
 		m_LightingFn = std::bind( &Renderer::BRDFLightingFn, this, std::placeholders::_1, std::placeholders::_2 );
+		break;
+	case LightingMode::BVH:
+		m_LightingFn = std::bind( &Renderer::BVHLightingFn, this, std::placeholders::_1, std::placeholders::_2 );
 		break;
 	case LightingMode::Combined:
 		m_LightingFn = std::bind( &Renderer::CombinedLightingFn, this, std::placeholders::_1, std::placeholders::_2 );
