@@ -23,7 +23,7 @@ static void LoadScene( Scene** pScene, const std::function<Scene* ( )>& fnFactor
 	delete *pScene;
 	*pScene = fnFactory();
 
-	LogSceneInfo( { ( *pScene )->GetSceneName(), "Initializing" } );
+	LogSceneInfo( "Initializing ..." );
 	( *pScene )->Initialize( );
 }
 
@@ -110,9 +110,6 @@ int main( int argc, char* args[] )
 					break;
 				case SDL_SCANCODE_F4:
 					pRenderer->ToggleGlobalIllumination( );
-					break;
-				case SDL_SCANCODE_F5:
-					pRenderer->ToggleSoftShadows( );
 					break;
 				case SDL_SCANCODE_UP:
 					sceneIndex = ( sceneIndex + 1 ) % sceneFactories.size( );

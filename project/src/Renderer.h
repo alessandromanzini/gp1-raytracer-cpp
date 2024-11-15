@@ -21,6 +21,13 @@ namespace dae
 		Combined	  // Combination of all
 	};
 
+	enum class ShadowMode
+	{
+		Hard,
+		Soft,
+		None
+	};
+
 	class Renderer final
 	{
 	public:
@@ -40,7 +47,6 @@ namespace dae
 		void ToggleShadows( );
 		void ToggleLightingMode( );
 		void ToggleGlobalIllumination( );
-		void ToggleSoftShadows( );
 
 		LightingMode GetLightingMode( );
 
@@ -49,9 +55,8 @@ namespace dae
 	private:
 		LightingMode m_LightingMode{ LightingMode::Combined };
 		std::function<void( ShadeInfo& shadeInfo, const LightingInfo&, ColorRGB& )> m_LightingFn{};
-		bool m_ShadowsEnabled{ true };
+		ShadowMode m_ShadowsMode{ ShadowMode::Hard };
 		bool m_GlobalIlluminationEnabled{ false };
-		bool m_SoftShadowsEnabled{ false };
 
 		SDL_Window* m_pWindow{};
 

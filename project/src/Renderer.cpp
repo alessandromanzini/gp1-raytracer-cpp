@@ -18,9 +18,9 @@
 
 #define INDIRECT_SAMPLING 3
 #define INDIRECT_LIGHTING_FACTOR .1f
-#define INDIRECT_MAX_DEVIATION 0.4f
+#define INDIRECT_MAX_DEVIATION 0.3f
 
-#define SHADOW_SAMPLES 8
+#define SHADOW_SAMPLES 4
 #define SHADOW_RADIUS .05f
 
 using namespace dae;
@@ -110,53 +110,60 @@ void dae::Renderer::ProcessRay( Scene* pScene, Ray ray, ColorRGB& finalColor, in
 			info.pLight = &light;
 
 			Ray shadowRay{ info.closestHit.origin + info.closestHit.normal * .0005f, info.hitToLight, .0001f, info.hitToLightDistance };
+			bool forceRender{ m_ShadowsMode == ShadowMode::None };
 
-			// if shadow ray doesn't hit anything, we have a clear view of the light
-			// if shadows are not enabled, continue
-			if ( !m_ShadowsEnabled || !pScene->DoesHit( std::move( shadowRay ) ) )
+			switch ( m_ShadowsMode )
 			{
-				info.observedAreaMeasure = Vector3::Dot( info.closestHit.normal, info.hitToLight );
-				if ( info.observedAreaMeasure >= 0.f )
+			case ShadowMode::Soft:
+				// Render soft shadows and update shadowfactor in the info struct
+				RenderSoftShadows( pScene, info );
+				forceRender = true;
+				[[fallthrough]];
+			case ShadowMode::None:
+			case ShadowMode::Hard:
+				// if shadow ray doesn't hit anything, we have a clear view of the light
+				// if force render becasuse of soft shadows, continue
+				if ( forceRender || !pScene->DoesHit( std::move( shadowRay ) ) )
 				{
-					ShadeInfo shadeInfo{};
-
-					// Set material and call the lighting function to obtain pixel color
-					info.pMaterial = pScene->GetMaterials( )[info.closestHit.materialIndex];
-
-					if ( m_SoftShadowsEnabled )
+					info.observedAreaMeasure = Vector3::Dot( info.closestHit.normal, info.hitToLight );
+					if ( info.observedAreaMeasure >= 0.f )
 					{
-						RenderSoftShadows( pScene, info );
-					}
+						ShadeInfo shadeInfo{};
 
-					m_LightingFn( shadeInfo, info, finalColor );
+						// Set material and call the lighting function to obtain pixel color
+						info.pMaterial = pScene->GetMaterials( )[info.closestHit.materialIndex];
 
-					// Recursive call for reflections
-					if ( bounce < MAX_RAY_BOUNCES )
-					{
-						if ( shadeInfo.needsBounce )
+						m_LightingFn( shadeInfo, info, finalColor );
+
+						// Recursive call for reflections
+						if ( bounce < MAX_RAY_BOUNCES )
 						{
-							ColorRGB reflectionColor{};
-							ProcessRay( pScene, shadeInfo.reflectionRay, reflectionColor, bounce + 1 );
-							finalColor = finalColor * (1.f - shadeInfo.reflectance) + reflectionColor * shadeInfo.reflectance;
-						}
-						if ( m_GlobalIlluminationEnabled )
-						{
-							ColorRGB indirectColor{};
-							for ( int i{}; i < INDIRECT_SAMPLING; ++i )
+							if ( shadeInfo.needsBounce )
 							{
-								Ray randomDirection{ info.closestHit.origin, LightUtils::GetRandomPointInRadius( light.origin, INDIRECT_MAX_DEVIATION ) };
-								randomDirection.direction.Normalize( );
-								randomDirection.origin += randomDirection.direction * INDIRECT_MAX_DEVIATION;
-								ProcessRay( pScene, randomDirection, indirectColor, bounce + 1 );
+								ColorRGB reflectionColor{};
+								ProcessRay( pScene, shadeInfo.reflectionRay, reflectionColor, bounce + 1 );
+								finalColor = finalColor * ( 1.f - shadeInfo.reflectance ) + reflectionColor * shadeInfo.reflectance;
+							}
+							if ( m_GlobalIlluminationEnabled )
+							{
+								ColorRGB indirectColor{};
+								for ( int i{}; i < INDIRECT_SAMPLING; ++i )
+								{
+									Ray randomDirection{ info.closestHit.origin, LightUtils::GetRandomPointInRadius( light.origin, INDIRECT_MAX_DEVIATION ) };
+									randomDirection.direction.Normalize( );
+									randomDirection.origin += randomDirection.direction * INDIRECT_MAX_DEVIATION;
+									ProcessRay( pScene, randomDirection, indirectColor, bounce + 1 );
 
-								// Use weight of the cosine of the angle between the normal and the random direction
-								finalColor += indirectColor 
-									* std::abs(Vector3::Dot(info.closestHit.normal, randomDirection.direction) )
-									* INDIRECT_LIGHTING_FACTOR;
+									// Use weight of the cosine of the angle between the normal and the random direction
+									finalColor += indirectColor
+										* std::abs( Vector3::Dot( info.closestHit.normal, randomDirection.direction ) )
+										* INDIRECT_LIGHTING_FACTOR;
+								}
 							}
 						}
 					}
 				}
+				break;
 			}
 		}
 	}
@@ -169,7 +176,14 @@ bool Renderer::SaveBufferToImage( ) const
 
 void dae::Renderer::ToggleShadows( )
 {
-	m_ShadowsEnabled = !m_ShadowsEnabled;
+	if ( m_ShadowsMode == ShadowMode::None )
+	{
+		m_ShadowsMode = ShadowMode( static_cast<int>( 0 ) );
+	}
+	else
+	{
+		m_ShadowsMode = ShadowMode( static_cast<int>( m_ShadowsMode ) + 1 );
+	}
 }
 
 void dae::Renderer::ToggleLightingMode( )
@@ -187,11 +201,6 @@ void dae::Renderer::ToggleLightingMode( )
 void dae::Renderer::ToggleGlobalIllumination( )
 {
 	m_GlobalIlluminationEnabled = !m_GlobalIlluminationEnabled;
-}
-
-void dae::Renderer::ToggleSoftShadows( )
-{
-	m_SoftShadowsEnabled = !m_SoftShadowsEnabled;
 }
 
 LightingMode dae::Renderer::GetLightingMode( )
@@ -240,10 +249,10 @@ void dae::Renderer::RenderSoftShadows( Scene* pScene, LightingInfo& info ) const
 		Ray shadowRay( info.closestHit.origin + info.closestHit.normal * SHADOW_RADIUS, rhitToLight, 0.0001f, rhitToLightDistance );
 		if ( !pScene->DoesHit( shadowRay ) )
 		{
-			info.shadowFactor += 1.0f;
+			info.shadowFactor += std::clamp( std::abs( Vector3::Dot( info.closestHit.normal, rhitToLight ) ), 0.6f, 1.f);
 		}
 	}
-	info.shadowFactor /= (SHADOW_SAMPLES + 1);
+	info.shadowFactor /= SHADOW_SAMPLES + 1;
 }
 
 void dae::Renderer::UpdateBuffer( dae::ColorRGB& finalColor, uint32_t* const pBufferHead ) const
@@ -280,24 +289,9 @@ void dae::Renderer::SetLightingMode( LightingMode mode )
 void dae::LogSceneInfo( const Scene* pScene, const Renderer* pRenderer, float dFPS )
 {
 	LogInfo logInfo{};
-	logInfo.sceneName = pScene->GetSceneName( );
-	switch ( pRenderer->m_LightingMode )
-	{
-	case LightingMode::ObservedArea:
-		logInfo.status = "Observed Area";
-		break;
-	case LightingMode::Radiance:
-		logInfo.status = "Radiance";
-		break;
-	case LightingMode::BRDF:
-		logInfo.status = "BRDF";
-		break;
-	case LightingMode::Combined:
-		logInfo.status = "Combined";
-		break;
-	}
-	logInfo.shadows = pRenderer->m_ShadowsEnabled;
-	logInfo.ss = pRenderer->m_SoftShadowsEnabled;
+	logInfo.pScene = pScene;
+	logInfo.lightingMode = static_cast<int>( pRenderer->m_LightingMode );
+	logInfo.shadowMode = static_cast<int>( pRenderer->m_ShadowsMode );
 	logInfo.gi = pRenderer->m_GlobalIlluminationEnabled;
 	logInfo.dFPS = dFPS;
 	LogSceneInfo( logInfo );
