@@ -16,7 +16,6 @@ add_executable(${PROJECT_NAME} ${SOURCES})
 # only needed if header files are not in same directory as source files
 # target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
-
 # Copy resources to output folder
 set(RESOURCES_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/resources")
 file(GLOB_RECURSE RESOURCE_FILES

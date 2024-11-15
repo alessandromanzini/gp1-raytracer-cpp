@@ -16,13 +16,13 @@
 #include "Renderer.h"
 #include "Scene.h"
 
-//#define SIMPLE_OUTPUT;
+//#define USE_SIMPLE_OUTPUT
 
 using namespace dae;
 
 static void LogSceneInfo( const Scene* pScene, const std::string& status, float dFPS = 0.f )
 {
-#ifdef SIMPLE_OUTPUT 
+#ifdef USE_SIMPLE_OUTPUT 
 	std::cout << pScene->GetSceneName( ) << " - FPS: " << dFPS << std::endl;
 	return;
 #else

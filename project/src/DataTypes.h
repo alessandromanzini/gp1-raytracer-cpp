@@ -105,6 +105,9 @@ namespace dae
 
 		float EvaluateSAH( BVHNode& node, uint8_t axis, float pos );
 
+		float FindBestSplitPlane( BVHNode& node, uint8_t& axis, float& splitPos );
+		float CalculateNodeCost( BVHNode& node );
+
 		uint32_t GetLookupIdx( uint32_t idx ) const;
 	};
 #pragma endregion

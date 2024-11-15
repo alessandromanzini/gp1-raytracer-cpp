@@ -10,12 +10,27 @@ struct aabb
 		bmin = Vector3::Min( bmin, p );
 		bmax = Vector3::Max( bmax, p );
 	}
+
+	void grow( const aabb& other )
+	{
+		bmin = Vector3::Min( bmin, other.bmin );
+		bmax = Vector3::Max( bmax, other.bmax );
+	}
+
 	float area( )
 	{
 		Vector3 e = bmax - bmin; // box extent
 		return e.x * e.y + e.y * e.z + e.z * e.x;
 	}
 };
+
+struct Bin
+{
+	aabb bounds; 
+	uint32_t triCount = 0;
+};
+
+constexpr int BINS = 8;
 
 MeshBVHNodeBuilder::MeshBVHNodeBuilder( const std::vector<Vector3>& positions, const std::vector<uint32_t>& indices ) :
 	m_Positions{ positions },
@@ -66,19 +81,30 @@ void MeshBVHNodeBuilder::UpdateNodeBounds( BVHNode bvhNode[], uint32_t nodeIdx )
 		node.aabbMax = Vector3::Max( node.aabbMax, leafTri.v2 );
 	}
 }
-//
+
 //void MeshBVHNodeBuilder::Subdivide( BVHNode bvhNode[], uint32_t nodeIdx )
 //{
 //	// terminate recursion
 //	BVHNode& node = bvhNode[nodeIdx];
-//	if ( node.triCount <= 2 ) return;
 //
-//	// determine split axis and position
-//	Vector3 extent = node.aabbMax - node.aabbMin;
-//	uint8_t axis = 0;
-//	if ( extent.y > extent.x ) axis = 1;
-//	if ( extent.z > extent[axis] ) axis = 2;
-//	float splitPos = node.aabbMin[axis] + extent[axis] * 0.5f;
+//	// determine split axis using SAH
+//	int bestAxis = -1;
+//	float bestPos = 0, bestCost = 1e30f;
+//	for ( int axis = 0; axis < 3; axis++ ) for ( uint32_t i = 0; i < node.triCount; i++ )
+//	{
+//		CentroidTriangle& triangle = m_Triangles[GetLookupIdx( node.leftFirst + i )];
+//		float candidatePos = triangle.centroid[axis];
+//		float cost = EvaluateSAH( node, axis, candidatePos );
+//		if ( cost < bestCost )
+//			bestPos = candidatePos, bestAxis = axis, bestCost = cost;
+//	}
+//	int axis = bestAxis;
+//	float splitPos = bestPos;
+//
+//	Vector3 e = node.aabbMax - node.aabbMin; // extent of parent
+//	float parentArea = e.x * e.y + e.y * e.z + e.z * e.x;
+//	float parentCost = node.triCount * parentArea;
+//	if ( bestCost >= parentCost ) return;
 //
 //	uint32_t i = node.leftFirst;
 //	uint32_t j = i + node.triCount - 1;
@@ -99,6 +125,7 @@ void MeshBVHNodeBuilder::UpdateNodeBounds( BVHNode bvhNode[], uint32_t nodeIdx )
 //	}
 //
 //	// abort split if one of the sides is empty
+//
 //	uint32_t leftCount = i - node.leftFirst;
 //	if ( leftCount == 0 || leftCount == node.triCount ) return;
 //	// create child nodes
@@ -123,23 +150,16 @@ void MeshBVHNodeBuilder::Subdivide( BVHNode bvhNode[], uint32_t nodeIdx )
 	BVHNode& node = bvhNode[nodeIdx];
 
 	// determine split axis using SAH
-	int bestAxis = -1;
-	float bestPos = 0, bestCost = 1e30f;
-	for ( int axis = 0; axis < 3; axis++ ) for ( uint32_t i = 0; i < node.triCount; i++ )
-	{
-		CentroidTriangle& triangle = m_Triangles[GetLookupIdx( node.leftFirst + i )];
-		float candidatePos = triangle.centroid[axis];
-		float cost = EvaluateSAH( node, axis, candidatePos );
-		if ( cost < bestCost )
-			bestPos = candidatePos, bestAxis = axis, bestCost = cost;
-	}
-	int axis = bestAxis;
-	float splitPos = bestPos;
+	uint8_t axis;
+	float splitPos;
+	float splitCost = FindBestSplitPlane( node, axis, splitPos );
 
 	Vector3 e = node.aabbMax - node.aabbMin; // extent of parent
 	float parentArea = e.x * e.y + e.y * e.z + e.z * e.x;
 	float parentCost = node.triCount * parentArea;
-	if ( bestCost >= parentCost ) return;
+	
+	float nosplitCost = CalculateNodeCost( node );
+	if ( splitCost >= nosplitCost ) return;
 
 	uint32_t i = node.leftFirst;
 	uint32_t j = i + node.triCount - 1;
@@ -186,7 +206,7 @@ float dae::MeshBVHNodeBuilder::EvaluateSAH( BVHNode& node, uint8_t axis, float p
 	uint32_t leftCount = 0, rightCount = 0;
 	for ( uint32_t i = 0; i < node.triCount; i++ )
 	{
-		CentroidTriangle& triangle = m_Triangles[GetLookupIdx( node.leftFirst + i)];
+		CentroidTriangle& triangle = m_Triangles[GetLookupIdx( node.leftFirst + i )];
 		if ( triangle.centroid[axis] < pos )
 		{
 			leftCount++;
@@ -204,6 +224,81 @@ float dae::MeshBVHNodeBuilder::EvaluateSAH( BVHNode& node, uint8_t axis, float p
 	}
 	float cost = leftCount * leftBox.area( ) + rightCount * rightBox.area( );
 	return cost > 0 ? cost : 1e30f;
+}
+
+//float dae::MeshBVHNodeBuilder::FindBestSplitPlane( BVHNode& node, uint8_t& axis, float& splitPos )
+//{
+//	float bestCost = 1e30f;
+//	for ( int a = 0; a < 3; a++ ) for ( uint32_t i = 0; i < node.triCount; i++ )
+//	{
+//		CentroidTriangle& triangle = m_Triangles[GetLookupIdx( node.leftFirst + i )];
+//		float candidatePos = triangle.centroid[a];
+//		float cost = EvaluateSAH( node, a, candidatePos );
+//		if ( cost < bestCost ) splitPos = candidatePos, axis = a, bestCost = cost;
+//	}
+//	return bestCost;
+//}
+
+float dae::MeshBVHNodeBuilder::FindBestSplitPlane( BVHNode& node, uint8_t& axis, float& splitPos )
+{
+	float bestCost = 1e30f;
+	for ( int a = 0; a < 3; a++ )
+	{
+		float boundsMin = 1e30f, boundsMax = -1e30f;
+		for ( int i = 0; i < node.triCount; i++ )
+		{
+			CentroidTriangle& triangle = m_Triangles[GetLookupIdx( node.leftFirst + i )];
+			boundsMin = std::min( boundsMin, triangle.centroid[a] );
+			boundsMax = std::max( boundsMax, triangle.centroid[a] );
+		}
+		if ( boundsMin == boundsMax ) continue;
+		// populate the bins
+		Bin bin[BINS];
+		float scale = BINS / ( boundsMax - boundsMin );
+		for ( uint32_t i = 0; i < node.triCount; i++ )
+		{
+			CentroidTriangle& triangle = m_Triangles[GetLookupIdx( node.leftFirst + i )];
+			int binIdx = std::min( BINS - 1, (int) ( ( triangle.centroid[a] - boundsMin ) * scale ) );
+			bin[binIdx].triCount++;
+			bin[binIdx].bounds.grow( triangle.v0 );
+			bin[binIdx].bounds.grow( triangle.v1 );
+			bin[binIdx].bounds.grow( triangle.v2 );
+		}
+		// gather data for the 7 planes between the 8 bins
+		float leftArea[BINS - 1], rightArea[BINS - 1];
+		int leftCount[BINS - 1], rightCount[BINS - 1];
+		aabb leftBox, rightBox;
+		int leftSum = 0, rightSum = 0;
+		for ( int i = 0; i < BINS - 1; i++ )
+		{
+			leftSum += bin[i].triCount;
+			leftCount[i] = leftSum;
+			leftBox.grow( bin[i].bounds );
+			leftArea[i] = leftBox.area( );
+			rightSum += bin[BINS - 1 - i].triCount;
+			rightCount[BINS - 2 - i] = rightSum;
+			rightBox.grow( bin[BINS - 1 - i].bounds );
+			rightArea[BINS - 2 - i] = rightBox.area( );
+		}
+		// calculate SAH cost for the 7 planes
+		scale = ( boundsMax - boundsMin ) / BINS;
+		for ( int i = 0; i < BINS - 1; i++ )
+		{
+			float planeCost =
+				leftCount[i] * leftArea[i] + rightCount[i] * rightArea[i];
+			if ( planeCost < bestCost )
+				axis = a, splitPos = boundsMin + scale * ( i + 1 ),
+				bestCost = planeCost;
+		}
+	}
+	return bestCost;
+}
+
+float dae::MeshBVHNodeBuilder::CalculateNodeCost( BVHNode& node )
+{
+	Vector3 e = node.aabbMax - node.aabbMin; // extent of the node
+	float surfaceArea = e.x * e.y + e.y * e.z + e.z * e.x;
+	return node.triCount * surfaceArea;
 }
 
 uint32_t dae::MeshBVHNodeBuilder::GetLookupIdx( uint32_t idx ) const

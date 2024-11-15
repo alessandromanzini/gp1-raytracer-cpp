@@ -12,7 +12,7 @@
 #include "Material.h"
 #include "Utils.h"
 
-#define PARALLEL_EXECUTION
+#define USE_PARALLEL_EXECUTION
 
 using namespace dae;
 
@@ -44,7 +44,7 @@ void Renderer::Render( Scene* pScene ) const
 	Camera& camera = pScene->GetCamera( );
 	camera.CalculateCameraToWorld( );
 
-#ifdef PARALLEL_EXECUTION
+#ifdef USE_PARALLEL_EXECUTION
 	// Parallel logic
 	uint32_t amountOfPixels{ uint32_t( m_Width * m_Height ) };
 
