@@ -38,6 +38,7 @@ namespace dae
 
 		void ToggleShadows( );
 		void ToggleLightingMode( );
+		void ToggleGlobalIllumination( );
 
 		LightingMode GetLightingMode( );
 		
@@ -45,6 +46,7 @@ namespace dae
 		LightingMode m_LightingMode{ LightingMode::Combined };
 		std::function<void( ShadeInfo& shadeInfo, const LightingInfo&, ColorRGB& )> m_LightingFn{};
 		bool m_ShadowsEnabled{ true };
+		bool m_GlobalIlluminationEnabled{ false };
 
 		SDL_Window* m_pWindow{};
 

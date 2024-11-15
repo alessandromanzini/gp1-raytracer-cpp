@@ -4,7 +4,6 @@
 #include "BRDFs.h"
 
 #define USE_REFLECTIONS
-#define MAX_REFLECTION_BOUNCES 4
 
 namespace dae
 {

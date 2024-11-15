@@ -151,6 +151,9 @@ int main( int argc, char* args[] )
 				case SDL_SCANCODE_F3:
 					pRenderer->ToggleLightingMode( );
 					break;
+				case SDL_SCANCODE_F4:
+					pRenderer->ToggleGlobalIllumination( );
+					break;
 				case SDL_SCANCODE_UP:
 					sceneIndex = ( sceneIndex + 1 ) % sceneFactories.size( );
 					LoadScene( &pScene, sceneFactories.at( sceneIndex ) );

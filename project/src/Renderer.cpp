@@ -14,6 +14,12 @@
 
 #define USE_PARALLEL_EXECUTION
 
+#define MAX_RAY_BOUNCES 1
+
+#define INDIRECT_SAMPLING 3
+#define INDIRECT_LIGHTING_FACTOR .1f
+#define INDIRECT_MAX_DEVIATION 0.02f
+
 using namespace dae;
 
 Renderer::Renderer( SDL_Window* pWindow ) :
@@ -116,11 +122,29 @@ void dae::Renderer::ProcessRay( Scene* pScene, Ray ray, ColorRGB& finalColor, in
 					m_LightingFn( shadeInfo, info, finalColor );
 
 					// Recursive call for reflections
-					if ( shadeInfo.needsBounce && bounce < MAX_REFLECTION_BOUNCES )
+					if ( bounce < MAX_RAY_BOUNCES )
 					{
-						ColorRGB reflectionColor{};
-						ProcessRay( pScene, shadeInfo.reflectionRay, reflectionColor, bounce + 1 );
-						finalColor = finalColor * (1.f - shadeInfo.reflectance) + reflectionColor * shadeInfo.reflectance;
+						if ( shadeInfo.needsBounce )
+						{
+							ColorRGB reflectionColor{};
+							ProcessRay( pScene, shadeInfo.reflectionRay, reflectionColor, bounce + 1 );
+							finalColor = finalColor * (1.f - shadeInfo.reflectance) + reflectionColor * shadeInfo.reflectance;
+						}
+						if ( m_GlobalIlluminationEnabled )
+						{
+							ColorRGB indirectColor{};
+							for ( int i{}; i < INDIRECT_SAMPLING; ++i )
+							{
+								Ray randomDirection{ info.closestHit.origin, LightUtils::GetRandomPointInRadius( light.origin, INDIRECT_MAX_DEVIATION ) };
+								randomDirection.direction.Normalize( );
+								randomDirection.origin += randomDirection.direction * INDIRECT_MAX_DEVIATION;
+								ProcessRay( pScene, randomDirection, indirectColor, bounce + 1 );
+
+								finalColor += indirectColor 
+									* Vector3::Dot(info.closestHit.normal, randomDirection.direction) 
+									* INDIRECT_LIGHTING_FACTOR;
+							}
+						}
 					}
 				}
 			}
@@ -148,6 +172,11 @@ void dae::Renderer::ToggleLightingMode( )
 	{
 		SetLightingMode( LightingMode( static_cast<int>( m_LightingMode ) + 1 ) );
 	}
+}
+
+void dae::Renderer::ToggleGlobalIllumination( )
+{
+	m_GlobalIlluminationEnabled = !m_GlobalIlluminationEnabled;
 }
 
 LightingMode dae::Renderer::GetLightingMode( )

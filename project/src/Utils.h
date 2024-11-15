@@ -2,6 +2,7 @@
 #include <fstream>
 #include "Maths.h"
 #include "DataTypes.h"
+#include "SquirrelNoise5.hpp"
 
 namespace dae
 {
@@ -271,6 +272,28 @@ namespace dae
 			default:
 				throw std::runtime_error( "LightType not implemented yet." );
 			}
+		}
+
+		static unsigned int i{};
+		inline Vector3 GetRandomPointInRadius( const Vector3& origin, const float& radius )
+		{
+
+			// uniform numbers in a sphere
+
+			float u = Get1dNoiseZeroToOne( i );
+			float theta = 2.0f * M_PI * Get1dNoiseZeroToOne( ++i );
+			float phi = acos( 1.0f - 2.0f * u );
+
+			// convert to cartesian coordinates
+			float sinPhi = sin( phi );
+			Vector3 randomPoint(
+				sinPhi * cos( theta ),
+				sinPhi * sin( theta ),
+				cos( phi )
+			);
+
+			return origin + randomPoint * radius;
+
 		}
 
 		/*inline float CalculateLambertCosineLaw( const Light& light, const HitRecord& hitRecord )
