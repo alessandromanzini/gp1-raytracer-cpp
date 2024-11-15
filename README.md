@@ -15,10 +15,9 @@ WASD -> lateral movement
 EQ -> up/down movement
 Hold MouseLeft -> camera movement
 
-F2 -> toggle shadows
+F2 -> toggle shadows mode
 F3 -> toggle lighting mode
 F4 -> toggle global illumination 
-F5 -> toggle soft shadows
 
 
 - PRECOMPILER DIRECTIVES
