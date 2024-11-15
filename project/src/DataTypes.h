@@ -215,9 +215,18 @@ namespace dae
 			}
 		}
 
+		void InitializeBVH( )
+		{
+			pBVHRoot = new BVHNode[( indices.size( ) / 3 ) * 2 - 1];
+		}
+
 		void UpdateBVH( )
 		{
-			pBVHRoot = new BVHNode[ ( indices.size( ) / 3 ) * 2 - 1 ];
+			// Lazy loading
+			if ( !pBVHRoot )
+			{
+				InitializeBVH( );
+			}
 			MeshBVHNodeBuilder builder{ transformedPositions, indices };
 			builder.BuildBVH( pBVHRoot );
 		}
@@ -303,6 +312,7 @@ namespace dae
 		Material* pMaterial;
 
 		float observedAreaMeasure;
+		float shadowFactor = 1.f;
 	};
 
 	struct ShadeInfo

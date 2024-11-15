@@ -18,7 +18,10 @@
 
 #define INDIRECT_SAMPLING 3
 #define INDIRECT_LIGHTING_FACTOR .1f
-#define INDIRECT_MAX_DEVIATION 0.02f
+#define INDIRECT_MAX_DEVIATION 0.4f
+
+#define SHADOW_SAMPLES 8
+#define SHADOW_RADIUS .05f
 
 using namespace dae;
 
@@ -119,6 +122,12 @@ void dae::Renderer::ProcessRay( Scene* pScene, Ray ray, ColorRGB& finalColor, in
 
 					// Set material and call the lighting function to obtain pixel color
 					info.pMaterial = pScene->GetMaterials( )[info.closestHit.materialIndex];
+
+					if ( m_SoftShadowsEnabled )
+					{
+						RenderSoftShadows( pScene, info );
+					}
+
 					m_LightingFn( shadeInfo, info, finalColor );
 
 					// Recursive call for reflections
@@ -140,8 +149,9 @@ void dae::Renderer::ProcessRay( Scene* pScene, Ray ray, ColorRGB& finalColor, in
 								randomDirection.origin += randomDirection.direction * INDIRECT_MAX_DEVIATION;
 								ProcessRay( pScene, randomDirection, indirectColor, bounce + 1 );
 
+								// Use weight of the cosine of the angle between the normal and the random direction
 								finalColor += indirectColor 
-									* Vector3::Dot(info.closestHit.normal, randomDirection.direction) 
+									* std::abs(Vector3::Dot(info.closestHit.normal, randomDirection.direction) )
 									* INDIRECT_LIGHTING_FACTOR;
 							}
 						}
@@ -179,6 +189,11 @@ void dae::Renderer::ToggleGlobalIllumination( )
 	m_GlobalIlluminationEnabled = !m_GlobalIlluminationEnabled;
 }
 
+void dae::Renderer::ToggleSoftShadows( )
+{
+	m_SoftShadowsEnabled = !m_SoftShadowsEnabled;
+}
+
 LightingMode dae::Renderer::GetLightingMode( )
 {
 	return m_LightingMode;
@@ -192,17 +207,17 @@ inline void dae::Renderer::ScreenToNDC( float& x, float& y, int px, int py, floa
 
 void dae::Renderer::ObservedAreaLightingFn( ShadeInfo& shadeInfo, const LightingInfo& info, ColorRGB& finalColor ) const
 {
-	finalColor += ColorRGB{ 1.f, 1.f, 1.f } * info.observedAreaMeasure;
+	finalColor += ColorRGB{ 1.f, 1.f, 1.f } * info.observedAreaMeasure * info.shadowFactor;
 }
 
 void dae::Renderer::RadianceLightingFn( ShadeInfo& shadeInfo, const LightingInfo& info, ColorRGB& finalColor ) const
 {
-	finalColor += LightUtils::GetRadiance( *info.pLight, powf( info.hitToLightDistance, 2 ) );
+	finalColor += LightUtils::GetRadiance( *info.pLight, powf( info.hitToLightDistance, 2 ) ) * info.shadowFactor;
 }
 
 void dae::Renderer::BRDFLightingFn( ShadeInfo& shadeInfo, const LightingInfo& info, ColorRGB& finalColor ) const
 {
-	finalColor += info.pMaterial->Shade( shadeInfo, info.closestHit, info.hitToLight, -info.hitRay.direction );
+	finalColor += info.pMaterial->Shade( shadeInfo, info.closestHit, info.hitToLight, -info.hitRay.direction ) * info.shadowFactor;
 }
 
 void dae::Renderer::CombinedLightingFn( ShadeInfo& shadeInfo, const LightingInfo& info, ColorRGB& finalColor ) const
@@ -210,7 +225,25 @@ void dae::Renderer::CombinedLightingFn( ShadeInfo& shadeInfo, const LightingInfo
 	const ColorRGB Ergb{ LightUtils::GetRadiance( *info.pLight, powf( info.hitToLightDistance, 2 ) ) };
 	const ColorRGB BRDFrgb{ info.pMaterial->Shade( shadeInfo, info.closestHit, info.hitToLight, -info.hitRay.direction ) };
 
-	finalColor += Ergb * BRDFrgb * info.observedAreaMeasure;
+	finalColor += Ergb * BRDFrgb * info.observedAreaMeasure * info.shadowFactor;
+}
+
+void dae::Renderer::RenderSoftShadows( Scene* pScene, LightingInfo& info ) const
+{
+	for ( int i = 0; i < SHADOW_SAMPLES; ++i )
+	{
+		Vector3 randomizedLightPosition = LightUtils::GetRandomPointInRadius( info.pLight->origin, SHADOW_RADIUS );
+		
+		Vector3 rhitToLight{ randomizedLightPosition - info.closestHit.origin };
+		float rhitToLightDistance{ rhitToLight.Normalize( ) };
+
+		Ray shadowRay( info.closestHit.origin + info.closestHit.normal * SHADOW_RADIUS, rhitToLight, 0.0001f, rhitToLightDistance );
+		if ( !pScene->DoesHit( shadowRay ) )
+		{
+			info.shadowFactor += 1.0f;
+		}
+	}
+	info.shadowFactor /= (SHADOW_SAMPLES + 1);
 }
 
 void dae::Renderer::UpdateBuffer( dae::ColorRGB& finalColor, uint32_t* const pBufferHead ) const
@@ -242,4 +275,30 @@ void dae::Renderer::SetLightingMode( LightingMode mode )
 		m_LightingFn = std::bind( &Renderer::CombinedLightingFn, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3 );
 		break;
 	}
+}
+
+void dae::LogSceneInfo( const Scene* pScene, const Renderer* pRenderer, float dFPS )
+{
+	LogInfo logInfo{};
+	logInfo.sceneName = pScene->GetSceneName( );
+	switch ( pRenderer->m_LightingMode )
+	{
+	case LightingMode::ObservedArea:
+		logInfo.status = "Observed Area";
+		break;
+	case LightingMode::Radiance:
+		logInfo.status = "Radiance";
+		break;
+	case LightingMode::BRDF:
+		logInfo.status = "BRDF";
+		break;
+	case LightingMode::Combined:
+		logInfo.status = "Combined";
+		break;
+	}
+	logInfo.shadows = pRenderer->m_ShadowsEnabled;
+	logInfo.ss = pRenderer->m_SoftShadowsEnabled;
+	logInfo.gi = pRenderer->m_GlobalIlluminationEnabled;
+	logInfo.dFPS = dFPS;
+	LogSceneInfo( logInfo );
 }

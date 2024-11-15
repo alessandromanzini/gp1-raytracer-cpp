@@ -7,8 +7,6 @@
 #undef main
 
 //Standard includes
-#include <iostream>
-#include <iomanip>
 #include <vector>
 
 //Project includes
@@ -20,53 +18,12 @@
 
 using namespace dae;
 
-static void LogSceneInfo( const Scene* pScene, const std::string& status, float dFPS = 0.f )
-{
-#ifdef USE_SIMPLE_OUTPUT 
-	std::cout << pScene->GetSceneName( ) << " - FPS: " << dFPS << std::endl;
-	return;
-#else
-	system( "cls" );
-	std::cout << std::left;
-	std::cout << "+----------------------------------------------------+" << std::endl;
-	std::cout << "| Scene:     " << std::setw( 40 ) << pScene->GetSceneName() << "|" << std::endl;
-	std::cout << "| Mode:      " << std::setw( 40 ) << status << "|" << std::endl;
-	std::cout << "| FPS:       " << std::setw( 40 ) << dFPS << "|" << std::endl;
-	std::cout << "+----------------------------------------------------+" << std::endl;
-	/*std::cout << "| Planes:    " << std::setw() << "|" << std::endl;
-	std::cout << "| Spheres:   " << "|" << std::endl;
-	std::cout << "| Triangles: " << "|" << std::endl;
-	std::cout << "+----------------------------------------------------+" << std::endl;*/
-#endif
-}
-
-static void LogSceneInfo( const Scene* pScene, LightingMode lightingMode, float dFPS )
-{
-	std::string status{};
-	switch ( lightingMode )
-	{
-	case dae::LightingMode::ObservedArea:
-		status = "Observed Area";
-		break;
-	case dae::LightingMode::Radiance:
-		status = "Radiance";
-		break;
-	case dae::LightingMode::BRDF:
-		status = "BRDF";
-		break;
-	case dae::LightingMode::Combined:
-		status = "Combined";
-		break;
-	}
-	LogSceneInfo( pScene, status, dFPS );
-}
-
 static void LoadScene( Scene** pScene, const std::function<Scene* ( )>& fnFactory )
 {
 	delete *pScene;
 	*pScene = fnFactory();
 
-	LogSceneInfo( *pScene, "Initializing" );
+	LogSceneInfo( { ( *pScene )->GetSceneName(), "Initializing" } );
 	( *pScene )->Initialize( );
 }
 
@@ -154,6 +111,9 @@ int main( int argc, char* args[] )
 				case SDL_SCANCODE_F4:
 					pRenderer->ToggleGlobalIllumination( );
 					break;
+				case SDL_SCANCODE_F5:
+					pRenderer->ToggleSoftShadows( );
+					break;
 				case SDL_SCANCODE_UP:
 					sceneIndex = ( sceneIndex + 1 ) % sceneFactories.size( );
 					LoadScene( &pScene, sceneFactories.at( sceneIndex ) );
@@ -187,7 +147,11 @@ int main( int argc, char* args[] )
 		if ( printTimer >= 1.f )
 		{
 			printTimer = 0.f;
-			LogSceneInfo( pScene, pRenderer->GetLightingMode(), pTimer->GetdFPS( ) );
+#ifdef USE_SIMPLE_OUTPUT 
+			LogSceneInfo( pTimer->GetdFPS( ) );
+#else
+			LogSceneInfo( pScene, pRenderer, pTimer->GetdFPS( ) );
+#endif
 		}
 
 		//Save screenshot after full render

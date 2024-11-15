@@ -1,8 +1,9 @@
 #pragma once
 #include <fstream>
+#include <random>
 #include "Maths.h"
 #include "DataTypes.h"
-#include "SquirrelNoise5.hpp"
+#include "mangled_random.hpp"
 
 namespace dae
 {
@@ -277,9 +278,7 @@ namespace dae
 		static unsigned int i{};
 		inline Vector3 GetRandomPointInRadius( const Vector3& origin, const float& radius )
 		{
-
 			// uniform numbers in a sphere
-
 			float u = Get1dNoiseZeroToOne( i );
 			float theta = 2.0f * M_PI * Get1dNoiseZeroToOne( ++i );
 			float phi = acos( 1.0f - 2.0f * u );

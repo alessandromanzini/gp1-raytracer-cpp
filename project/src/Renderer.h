@@ -4,6 +4,7 @@
 #include <functional>
 
 #include "Scene.h"
+#include "logging.hpp"
 
 struct SDL_Window;
 struct SDL_Surface;
@@ -39,14 +40,18 @@ namespace dae
 		void ToggleShadows( );
 		void ToggleLightingMode( );
 		void ToggleGlobalIllumination( );
+		void ToggleSoftShadows( );
 
 		LightingMode GetLightingMode( );
+
+		friend void LogSceneInfo( const Scene* pScene, const Renderer* pRenderer, float dFPS );
 		
 	private:
 		LightingMode m_LightingMode{ LightingMode::Combined };
 		std::function<void( ShadeInfo& shadeInfo, const LightingInfo&, ColorRGB& )> m_LightingFn{};
 		bool m_ShadowsEnabled{ true };
 		bool m_GlobalIlluminationEnabled{ false };
+		bool m_SoftShadowsEnabled{ false };
 
 		SDL_Window* m_pWindow{};
 
@@ -66,6 +71,8 @@ namespace dae
 		void RadianceLightingFn( ShadeInfo& shadeInfo, const LightingInfo& info, ColorRGB& finalColor ) const;
 		void BRDFLightingFn( ShadeInfo& shadeInfo, const LightingInfo& info, ColorRGB& finalColor ) const;
 		void CombinedLightingFn( ShadeInfo& shadeInfo, const LightingInfo& info, ColorRGB& finalColor ) const;
+
+		void RenderSoftShadows( Scene* pScene, LightingInfo& info ) const;
 
 		void UpdateBuffer( dae::ColorRGB& finalColor, uint32_t* const pBufferHead ) const;
 
