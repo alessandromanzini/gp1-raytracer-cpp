@@ -103,6 +103,8 @@ namespace dae
 		void UpdateNodeBounds( BVHNode bvhNode[], uint32_t nodeIdx );
 		void Subdivide( BVHNode bvhNode[], uint32_t nodeIdx );
 
+		float EvaluateSAH( BVHNode& node, uint8_t axis, float pos );
+
 		uint32_t GetLookupIdx( uint32_t idx ) const;
 	};
 #pragma endregion
