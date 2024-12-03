@@ -156,7 +156,7 @@ void dae::Renderer::ProcessRay( Scene* pScene, Ray ray, ColorRGB& finalColor, in
 
 									// Use weight of the cosine of the angle between the normal and the random direction
 									finalColor += indirectColor
-										* std::abs( Vector3::Dot( info.closestHit.normal, randomDirection.direction ) )
+										* std::max( 0.f, Vector3::Dot( info.closestHit.normal, randomDirection.direction ) )
 										* INDIRECT_LIGHTING_FACTOR;
 								}
 							}
@@ -249,7 +249,8 @@ void dae::Renderer::RenderSoftShadows( Scene* pScene, LightingInfo& info ) const
 		Ray shadowRay( info.closestHit.origin + info.closestHit.normal * SHADOW_RADIUS, rhitToLight, 0.0001f, rhitToLightDistance );
 		if ( !pScene->DoesHit( shadowRay ) )
 		{
-			info.shadowFactor += std::clamp( std::abs( Vector3::Dot( info.closestHit.normal, rhitToLight ) ), 0.6f, 1.f);
+			//info.shadowFactor += std::clamp( std::abs( Vector3::Dot( info.closestHit.normal, rhitToLight ) ), 0.6f, 1.f);
+			info.shadowFactor += std::max(0.f, Vector3::Dot( info.closestHit.normal, rhitToLight ) );
 		}
 	}
 	info.shadowFactor /= SHADOW_SAMPLES + 1;
